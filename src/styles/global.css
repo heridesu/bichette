@@ -68,7 +68,6 @@ h1, h2, h3, p {
    inline per piece since it's generated per-instance. */
 .deco-tape {
   position: absolute;
-  aspect-ratio: 160 / 34;
   opacity: 0.85;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
   background-color: var(--tape-color);

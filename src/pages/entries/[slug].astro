@@ -3,7 +3,8 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Figure from '../../components/Figure.astro';
 import FigureGrid from '../../components/FigureGrid.astro';
-import { itemZ, tapeClipPath, youtubeEmbedId } from '../../lib/decorations';
+import { itemZ, tapeClipPath, tapeHeightPercent, youtubeEmbedId } from '../../lib/decorations';
+import { responsiveSrcSet } from '../../lib/images';
 
 export async function getStaticPaths() {
   const entries = await getCollection('entries');
@@ -58,15 +59,29 @@ function tileWrapper(href: string | undefined) {
           class="deco-canvas"
           style={`aspect-ratio:${section.canvasWidth}/${section.canvasHeight};${i > 0 ? 'margin-top:3rem;' : ''}`}
         >
-          {section.tiles.map((tile) => {
+          {section.tiles.map((tile, ti) => {
             const { tag: Tag, attrs } = tileWrapper(tile.href);
+            // Only the very first tile of the first section gets eager
+            // loading — a collage section can hold many overlapping
+            // tiles, and marking all of them high-priority would defeat
+            // the point of prioritizing anything.
+            const eager = i === 0 && ti === 0;
             return (
               <Tag
                 class={`deco-tile${tile.href ? ' deco-tile--linked' : ''}${tile.border ? ' deco-tile--bordered' : ''}${tile.mat ? ' deco-tile--matted' : ''}`}
                 style={`left:${tile.left}%;top:${tile.top}%;width:${tile.width}%;height:${tile.height}%;z-index:${itemZ('tile', tile)};`}
                 {...(attrs as any)}
               >
-                {tile.kind === 'image' && <img src={tile.src} alt={tile.alt ?? ''} loading="lazy" />}
+                {tile.kind === 'image' && (
+                  <img
+                    src={tile.src}
+                    srcset={responsiveSrcSet(tile.src)}
+                    sizes="(max-width: 900px) 100vw, 900px"
+                    alt={tile.alt ?? ''}
+                    loading={eager ? 'eager' : 'lazy'}
+                    fetchpriority={eager ? 'high' : undefined}
+                  />
+                )}
                 {tile.kind === 'video' && <video src={tile.src} controls playsinline preload="metadata" />}
                 {tile.kind === 'youtube' && tile.url && (
                   <iframe
@@ -84,7 +99,7 @@ function tileWrapper(href: string | undefined) {
           {section.tape.map((piece) => (
             <div
               class="deco-tape"
-              style={`left:${piece.left}%;top:${piece.top}%;width:${piece.width}%;z-index:${itemZ('tape', piece)};--tape-color:${piece.color};transform:rotate(${piece.rotation}deg);clip-path:${tapeClipPath(piece.torn, piece.tornSeed)};`}
+              style={`left:${piece.left}%;top:${piece.top}%;width:${piece.width}%;height:${tapeHeightPercent(piece, section.canvasWidth, section.canvasHeight)}%;z-index:${itemZ('tape', piece)};--tape-color:${piece.color};transform:rotate(${piece.rotation}deg);clip-path:${tapeClipPath(piece.torn, piece.tornSeed)};`}
             />
           ))}
           {section.tacks.map((tack) => (
@@ -104,7 +119,14 @@ function tileWrapper(href: string | undefined) {
 
       {image && (
         <div class="entry-minimal__frame" style={aspect ? `aspect-ratio: ${aspect};` : ''}>
-          <img src={image} alt={imageAlt ?? title ?? ''} loading="eager" />
+          <img
+            src={image}
+            srcset={responsiveSrcSet(image)}
+            sizes="(max-width: 900px) 100vw, 900px"
+            alt={imageAlt ?? title ?? ''}
+            loading="eager"
+            fetchpriority="high"
+          />
         </div>
       )}
 

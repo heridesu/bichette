@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Rnd } from 'react-rnd';
 import type { DesktopSection, DesktopTile, EntryInfo, LinkSpec } from './types';
 import LinkEditor from './LinkEditor';
+import { midSrc, thumbSrc } from '../../lib/images';
 
 const CANVAS_PX = 860;
 
@@ -175,7 +176,7 @@ export default function DesktopEditor({ sections, entriesMap, entriesList, colle
                         onMouseDown={() => setSelected({ section: sectionIndex, tile: tileIndex })}
                       >
                         {entry?.image ? (
-                          <img src={entry.image} alt="" draggable={false} />
+                          <img src={midSrc(entry.image)} alt="" draggable={false} />
                         ) : (
                           <div className="studio__tile-placeholder">
                             {entry ? `${entry.title ?? entry.slug} — no image` : `missing: ${tile.slug}`}
@@ -198,7 +199,7 @@ export default function DesktopEditor({ sections, entriesMap, entriesList, colle
         {selectedTile && selectedEntry ? (
           <>
             <h3>Selected image</h3>
-            <img className="studio__thumb" src={selectedEntry.image} alt="" />
+            <img className="studio__thumb" src={thumbSrc(selectedEntry.image)} alt="" />
 
             <div className="studio__field">
               <label>Swap to existing entry</label>

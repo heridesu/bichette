@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import type { CollageData, CollageSection, CollageTile, TackPiece, TapePiece } from './types';
-import { WASHI_COLORS, itemZ, nextZ, tapeClipPath, youtubeEmbedId } from '../../lib/decorations';
+import { TAPE_ASPECT, WASHI_COLORS, itemZ, nextZ, tapeClipPath, tapeHeightPercent, youtubeEmbedId } from '../../lib/decorations';
+import { midSrc, thumbSrc } from '../../lib/images';
 
 const CANVAS_PX = 860;
-const TAPE_ASPECT = 160 / 34;
 const POSITIONAL_KEYS = ['left', 'top', 'width', 'height'];
 
 function genId(): string {
@@ -22,12 +22,23 @@ interface Props {
 export default function CollageEditor({ collage, onChange, onUpload }: Props) {
   const [selected, setSelected] = useState<Selected>(null);
 
+  // Several flows (upload-then-patch, bring-forward-then-...) call
+  // onChange and then, after an `await`, need to read the result of that
+  // very update — but `collage` is a prop, frozen at whatever it was
+  // when this render's closures were created, so a second read of it
+  // after an await is stale (the update from the first call never shows
+  // up in this closure). A ref that's reassigned every render always
+  // points at the latest value, sidestepping that entirely.
+  const collageRef = useRef(collage);
+  collageRef.current = collage;
+
   function patchSection(sectionIndex: number, updater: (section: CollageSection) => CollageSection) {
-    onChange({ ...collage, sections: collage.sections.map((s, i) => (i === sectionIndex ? updater(s) : s)) });
+    const current = collageRef.current;
+    onChange({ ...current, sections: current.sections.map((s, i) => (i === sectionIndex ? updater(s) : s)) });
   }
 
   function patchTile(sectionIndex: number, id: string, patch: Partial<CollageTile>) {
-    const section = collage.sections[sectionIndex];
+    const section = collageRef.current.sections[sectionIndex];
     const current = section.tiles.find((t) => t.id === id);
     if (!current) return;
     // react-rnd fires a drag/resize-stop event on a plain click (zero
@@ -50,7 +61,7 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
   }
 
   function patchTape(sectionIndex: number, id: string, patch: Partial<TapePiece>) {
-    const section = collage.sections[sectionIndex];
+    const section = collageRef.current.sections[sectionIndex];
     const current = section.tape.find((t) => t.id === id);
     if (!current) return;
     const EPSILON = 0.05;
@@ -67,7 +78,7 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
   }
 
   function patchTack(sectionIndex: number, id: string, patch: Partial<TackPiece>) {
-    const section = collage.sections[sectionIndex];
+    const section = collageRef.current.sections[sectionIndex];
     const current = section.tacks.find((t) => t.id === id);
     if (!current) return;
     const EPSILON = 0.05;
@@ -95,21 +106,23 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
   }
 
   function addSection() {
+    const current = collageRef.current;
     const section: CollageSection = { canvasWidth: 1440, canvasHeight: 900, tiles: [], tape: [], tacks: [] };
-    onChange({ ...collage, sections: [...collage.sections, section] });
+    onChange({ ...current, sections: [...current.sections, section] });
   }
 
   function removeSection(sectionIndex: number) {
-    const s = collage.sections[sectionIndex];
+    const current = collageRef.current;
+    const s = current.sections[sectionIndex];
     if (s.tiles.length > 0 || s.tape.length > 0 || s.tacks.length > 0) return;
-    onChange({ ...collage, sections: collage.sections.filter((_, i) => i !== sectionIndex) });
+    onChange({ ...current, sections: current.sections.filter((_, i) => i !== sectionIndex) });
     if (selected?.section === sectionIndex) setSelected(null);
   }
 
   // Stacking order is scoped to one section — it's never meaningful to
   // reorder an element relative to something in a different canvas.
   function allStacked(sectionIndex: number) {
-    const s = collage.sections[sectionIndex];
+    const s = collageRef.current.sections[sectionIndex];
     return [
       ...s.tiles.map((t) => ({ ref: { kind: 'tile' as const, id: t.id }, z: itemZ('tile', t) })),
       ...s.tape.map((t) => ({ ref: { kind: 'tape' as const, id: t.id }, z: itemZ('tape', t) })),
@@ -159,33 +172,24 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
   }
 
   async function handleUploadImage(sectionIndex: number, file: File) {
+    // Shows the picked file immediately via a local blob URL, before the
+    // upload round-trip even starts, then swaps to the real saved path
+    // once it resolves — so there's never a gap with no preview at all.
+    const previewUrl = URL.createObjectURL(file);
+    const id = genId();
+    addTile(sectionIndex, { kind: 'image', id, src: previewUrl, left: 35, top: 35, width: 25, height: 20, z: nextZ(collageRef.current.sections[sectionIndex]) });
     const { src, aspect } = await onUpload(file);
-    addTile(sectionIndex, {
-      kind: 'image',
-      id: genId(),
-      src,
-      aspect,
-      left: 35,
-      top: 35,
-      width: 25,
-      height: 20,
-      z: nextZ(collage.sections[sectionIndex]),
-    });
+    patchTile(sectionIndex, id, { src, aspect } as Partial<CollageTile>);
+    URL.revokeObjectURL(previewUrl);
   }
 
   async function handleUploadVideo(sectionIndex: number, file: File) {
+    const previewUrl = URL.createObjectURL(file);
+    const id = genId();
+    addTile(sectionIndex, { kind: 'video', id, src: previewUrl, left: 35, top: 35, width: 25, height: 20, z: nextZ(collageRef.current.sections[sectionIndex]) });
     const { src, aspect } = await onUpload(file);
-    addTile(sectionIndex, {
-      kind: 'video',
-      id: genId(),
-      src,
-      aspect,
-      left: 35,
-      top: 35,
-      width: 25,
-      height: 20,
-      z: nextZ(collage.sections[sectionIndex]),
-    });
+    patchTile(sectionIndex, id, { src, aspect } as Partial<CollageTile>);
+    URL.revokeObjectURL(previewUrl);
   }
 
   function addYouTube(sectionIndex: number) {
@@ -197,7 +201,7 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
       top: 35,
       width: 28,
       height: 18,
-      z: nextZ(collage.sections[sectionIndex]),
+      z: nextZ(collageRef.current.sections[sectionIndex]),
     });
   }
 
@@ -210,13 +214,16 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
       top: 35,
       width: 22,
       height: 14,
-      z: nextZ(collage.sections[sectionIndex]),
+      z: nextZ(collageRef.current.sections[sectionIndex]),
     });
   }
 
   async function handleReplaceImage(sectionIndex: number, id: string, file: File) {
+    const previewUrl = URL.createObjectURL(file);
+    patchTile(sectionIndex, id, { src: previewUrl } as Partial<CollageTile>);
     const { src, aspect } = await onUpload(file);
     patchTile(sectionIndex, id, { src, aspect } as Partial<CollageTile>);
+    URL.revokeObjectURL(previewUrl);
   }
 
   function addTack(sectionIndex: number) {
@@ -224,22 +231,31 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
       id: genId(),
       left: 40 + Math.random() * 20,
       top: 40 + Math.random() * 20,
-      z: nextZ(collage.sections[sectionIndex]),
+      z: nextZ(collageRef.current.sections[sectionIndex]),
     };
     patchSection(sectionIndex, (s) => ({ ...s, tacks: [...s.tacks, tack] }));
     setSelected({ section: sectionIndex, kind: 'tack', id: tack.id });
   }
 
   function addTape(sectionIndex: number, color: string) {
+    const section = collage.sections[sectionIndex];
+    const width = 18;
+    // Thickness is set once here, from the legacy width:height ratio at
+    // this starting width — then stored and left alone forever after.
+    // Resizing only ever changes `width` (length); real tape doesn't get
+    // thicker the more of it you pull out.
+    const widthPx = (width / 100) * section.canvasWidth;
+    const height = (widthPx / TAPE_ASPECT / section.canvasHeight) * 100;
     const piece: TapePiece = {
       id: genId(),
       color,
       left: 30 + Math.random() * 20,
       top: 30 + Math.random() * 20,
-      width: 18,
+      width,
+      height,
       rotation: Math.random() * 16 - 8,
       torn: false,
-      z: nextZ(collage.sections[sectionIndex]),
+      z: nextZ(collageRef.current.sections[sectionIndex]),
     };
     patchSection(sectionIndex, (s) => ({ ...s, tape: [...s.tape, piece] }));
     setSelected({ section: sectionIndex, kind: 'tape', id: piece.id });
@@ -386,7 +402,7 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
                         style={{ width: '100%', height: '100%' }}
                         onMouseDown={() => setSelected({ section: si, kind: 'tile', id: tile.id })}
                       >
-                        {tile.kind === 'image' && <img src={tile.src} alt={tile.alt ?? ''} draggable={false} />}
+                        {tile.kind === 'image' && <img src={midSrc(tile.src)} alt={tile.alt ?? ''} draggable={false} />}
                         {tile.kind === 'video' && <video src={tile.src} muted loop autoPlay playsInline />}
                         {tile.kind === 'youtube' &&
                           (tile.url ? (
@@ -404,7 +420,7 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
                   const x = (piece.left / 100) * CANVAS_PX;
                   const y = (piece.top / 100) * heightPx;
                   const w = (piece.width / 100) * CANVAS_PX;
-                  const h = w / TAPE_ASPECT;
+                  const h = (tapeHeightPercent(piece, section.canvasWidth, section.canvasHeight) / 100) * heightPx;
                   const isSelected = selected?.section === si && selected.kind === 'tape' && selected.id === piece.id;
                   return (
                     <Rnd
@@ -412,7 +428,18 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
                       size={{ width: w, height: h }}
                       position={{ x, y }}
                       bounds="parent"
-                      lockAspectRatio={TAPE_ASPECT}
+                      // Horizontal handles only — real tape has a fixed
+                      // thickness, so stretching it only makes it longer.
+                      enableResizing={{
+                        left: true,
+                        right: true,
+                        top: false,
+                        bottom: false,
+                        topLeft: false,
+                        topRight: false,
+                        bottomLeft: false,
+                        bottomRight: false,
+                      }}
                       style={{ zIndex: itemZ('tape', piece) }}
                       onDragStart={() => setSelected({ section: si, kind: 'tape', id: piece.id })}
                       onDragStop={(_e, d) =>
@@ -490,7 +517,7 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
         {selectedTile && selectedTile.kind === 'image' && (
           <>
             <h3>Image</h3>
-            <img className="studio__thumb" src={selectedTile.src} alt="" />
+            <img className="studio__thumb" src={thumbSrc(selectedTile.src)} alt="" />
             <div className="studio__field">
               <label>Replace with a new upload</label>
               <input

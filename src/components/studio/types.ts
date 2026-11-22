@@ -86,6 +86,7 @@ export interface TapePiece {
   left: number;
   top: number;
   width: number;
+  height?: number;
   rotation: number;
   torn: boolean;
   tornSeed?: number;

@@ -95,6 +95,19 @@
   padding-bottom: 8rem;
 }
 
+/* Same flex sizing as .studio__main, but deliberately NOT that class:
+   PagesEditor's own wrapper nests CollageEditor's sticky sidebar inside
+   it, and overflow-x:auto here would count as a scroll container for
+   that sidebar's position:sticky (per the CSS overflow-x/-y coupling
+   rule, setting one axis non-visible forces the other to `auto` too) —
+   breaking it from ever sticking to the actual page scroll. Nothing
+   here needs horizontal scrolling of its own. */
+.studio__page-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-bottom: 8rem;
+}
+
 .studio__section-header {
   display: flex;
   align-items: center;
@@ -176,12 +189,20 @@
 .studio__sidebar {
   width: 320px;
   flex: 0 0 auto;
+  /* Without this, the flex row's default align-items:stretch makes the
+     sidebar as tall as .studio__main (which can get very tall with
+     several sections) — sticky then has no room to "stick" since the
+     box is already as tall as the page, so its content just sits fixed
+     near the top and scrolls out of view instead of following along. */
+  align-self: flex-start;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 1rem;
   position: sticky;
   top: 5rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
 }
 
 .studio__sidebar h3 {
@@ -478,7 +499,6 @@
    also resets `body` and would fight Studio's own look. */
 .deco-tape {
   position: absolute;
-  aspect-ratio: 160 / 34;
   opacity: 0.85;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
   background-color: var(--tape-color);

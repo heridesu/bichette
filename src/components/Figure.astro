@@ -1,4 +1,6 @@
 ---
+import { responsiveSrcSet } from '../lib/images';
+
 // Usable both as the lead image on an entry page and inline inside an
 // MDX body (directly, or inside <FigureGrid>) — the same building block
 // either way, just with a different `size`.
@@ -22,11 +24,23 @@ const { src, alt = '', caption, aspect, size = 'inline', href, width, border, ma
 const Wrap = href ? 'a' : 'div';
 const narrow = typeof width === 'number' && width < 100;
 const frameClass = `figure__frame${border ? ' figure__frame--bordered' : ''}${mat ? ' figure__frame--matted' : ''}`;
+// The hero image is an entry page's lead photo — almost always the
+// first/most prominent thing on the page, so it should load promptly
+// rather than wait on the lazy-loading observer like everything else.
+const isHero = size === 'hero';
+const srcset = responsiveSrcSet(src);
 ---
 
 <figure class={`figure figure--${size}${narrow ? ' figure--narrow' : ''}`} style={narrow ? `width: ${width}%;` : ''}>
   <Wrap class={frameClass} style={aspect ? `aspect-ratio: ${aspect};` : ''} {...(href ? { href, target: href.startsWith('http') ? '_blank' : undefined, rel: href.startsWith('http') ? 'noopener noreferrer' : undefined } : {})}>
-    <img src={src} alt={alt} loading="lazy" />
+    <img
+      src={src}
+      srcset={srcset}
+      sizes="(max-width: 900px) 100vw, 900px"
+      alt={alt}
+      loading={isHero ? 'eager' : 'lazy'}
+      fetchpriority={isHero ? 'high' : undefined}
+    />
   </Wrap>
   {caption && <figcaption class="figure__caption">{caption}</figcaption>}
 </figure>

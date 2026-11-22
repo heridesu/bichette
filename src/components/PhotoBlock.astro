@@ -1,5 +1,6 @@
 ---
 import type { CollectionEntry } from 'astro:content';
+import { responsiveSrcSet } from '../lib/images';
 
 interface Props {
   entry: CollectionEntry<'entries'>;
@@ -11,7 +12,13 @@ const { image, imageAlt, aspect, caption, title, tags } = entry.data;
 
 <figure class="photo">
   <div class="photo__frame" style={aspect ? `aspect-ratio: ${aspect};` : ''}>
-    <img src={image} alt={imageAlt ?? title ?? ''} loading="lazy" />
+    <img
+      src={image}
+      srcset={image ? responsiveSrcSet(image) : undefined}
+      sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 350px"
+      alt={imageAlt ?? title ?? ''}
+      loading="lazy"
+    />
   </div>
   {(title || caption) && (
     <figcaption class="photo__caption">

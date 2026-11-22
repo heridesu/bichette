@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Block, CollageData, EntryType, PageData, PageSummary } from './types';
 import CollageEditor from './CollageEditor';
+import { thumbSrc } from '../../lib/images';
 
 // One section the same size as the homepage's own default section
 // (DesktopEditor's addSection()) — a collage page should feel like the
@@ -193,7 +194,7 @@ export default function PagesEditor() {
             className={`studio__page-row${originalSlug === p.slug ? ' studio__page-row--active' : ''}`}
             onClick={() => open(p.slug)}
           >
-            {p.image && <img src={p.image} alt="" />}
+            {p.image && <img src={thumbSrc(p.image)} alt="" />}
             <span>
               <strong>{p.title ?? p.slug}</strong>
               <small>{p.type}</small>
@@ -202,7 +203,7 @@ export default function PagesEditor() {
         ))}
       </div>
 
-      <div className="studio__main">
+      <div className="studio__page-content">
         {creating ? (
           <div className="studio__grid2" style={{ maxWidth: 420 }}>
             <div className="studio__field">
@@ -287,8 +288,11 @@ export default function PagesEditor() {
 
 function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<PageData>) => void }) {
   async function handleImageUpload(file: File) {
+    const previewUrl = URL.createObjectURL(file);
+    onChange({ image: previewUrl });
     const { src, aspect } = await uploadAsset(file);
     onChange({ image: src, aspect: aspect ?? page.aspect });
+    URL.revokeObjectURL(previewUrl);
   }
 
   return (
@@ -344,7 +348,7 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
 
       <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
         <label>Lead image</label>
-        {page.image && <img src={page.image} alt="" className="studio__thumb" style={{ marginBottom: '0.5rem' }} />}
+        {page.image && <img src={thumbSrc(page.image)} alt="" className="studio__thumb" style={{ marginBottom: '0.5rem' }} />}
         <input
           type="file"
           accept="image/*"
@@ -499,15 +503,18 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
   if (block.type === 'image') {
     return (
       <div>
-        {block.src && <img src={block.src} alt="" className="studio__thumb" />}
+        {block.src && <img src={thumbSrc(block.src)} alt="" className="studio__thumb" />}
         <input
           type="file"
           accept="image/*"
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
+              const previewUrl = URL.createObjectURL(file);
+              onChange({ ...block, src: previewUrl });
               const { src, aspect } = await uploadAsset(file);
               onChange({ ...block, src, aspect: aspect ?? block.aspect });
+              URL.revokeObjectURL(previewUrl);
             }
             e.currentTarget.value = '';
           }}
@@ -576,8 +583,11 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
+              const previewUrl = URL.createObjectURL(file);
+              onChange({ ...block, src: previewUrl });
               const { src } = await uploadAsset(file);
               onChange({ ...block, src });
+              URL.revokeObjectURL(previewUrl);
             }
             e.currentTarget.value = '';
           }}
@@ -612,7 +622,7 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
         <div className="studio__imagegrid-items">
           {block.images.map((img, i) => (
             <div key={i} className="studio__row-item">
-              {img.src && <img src={img.src} alt="" />}
+              {img.src && <img src={thumbSrc(img.src)} alt="" />}
               <div className="studio__row-item-fields">
                 <input
                   placeholder="Caption (optional)"
@@ -646,8 +656,11 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
+              const previewUrl = URL.createObjectURL(file);
+              onChange({ ...block, images: [...block.images, { src: previewUrl }] });
               const { src } = await uploadAsset(file);
               onChange({ ...block, images: [...block.images, { src }] });
+              URL.revokeObjectURL(previewUrl);
             }
             e.currentTarget.value = '';
           }}

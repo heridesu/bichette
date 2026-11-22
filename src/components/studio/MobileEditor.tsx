@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { EntryInfo, MobileItem, MobileSection } from './types';
 import LinkEditor from './LinkEditor';
+import { thumbSrc } from '../../lib/images';
 
 interface Props {
   sections: MobileSection[];
@@ -112,7 +113,7 @@ export default function MobileEditor({ sections, entriesMap, entriesList, collec
                     return (
                       <div key={ii} className="studio__row-item">
                         {entry?.image ? (
-                          <img src={entry.image} alt="" />
+                          <img src={thumbSrc(entry.image)} alt="" />
                         ) : (
                           <div className="studio__row-item-placeholder">no image</div>
                         )}

@@ -9,3 +9,10 @@ dist/
 # site instead. See src/pages/studio/ and src/pages/api/studio/.
 src/pages/studio/
 src/pages/api/studio/
+
+# Untouched camera-original uploads, kept only as a local safety copy —
+# never served (outside public/), never committed (would just re-bloat
+# the repo with full-resolution files the optimized public/photos/
+# versions already replace). Back these up yourself if you want an
+# off-machine copy of originals.
+originals/

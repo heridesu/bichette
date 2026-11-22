@@ -21,6 +21,19 @@ export const WASHI_COLORS: WashiColor[] = [
 
 export const TACK_SRC = '/decorations/tack-silver.png';
 
+// The tape graphic's original fixed width:height ratio — now used only
+// as a one-time fallback for a piece saved before per-piece `height`
+// existed, so it keeps its original look. Every piece since then stores
+// its own thickness and never derives it from width again (stretching a
+// piece should only make it longer, never thicker).
+export const TAPE_ASPECT = 160 / 34;
+
+export function tapeHeightPercent(piece: { width: number; height?: number }, canvasWidth: number, canvasHeight: number): number {
+  if (piece.height !== undefined) return piece.height;
+  const widthPx = (piece.width / 100) * canvasWidth;
+  return (widthPx / TAPE_ASPECT / canvasHeight) * 100;
+}
+
 // Default stacking order: tiles sit lowest, tape above them, tacks on
 // top of that — unchanged from before per-item z-index existed, so old
 // saved pieces (no `z` field) keep rendering exactly as they did. A new

@@ -38,6 +38,12 @@ const tapePiece = z.object({
   left: z.number(),
   top: z.number(),
   width: z.number(),
+  // Thickness, set once when the piece is created and never touched by
+  // resizing — real tape has a fixed thickness regardless of how much of
+  // it you tear off, so stretching a piece only ever changes `width`
+  // (length), never `height`. Optional for pieces saved before this
+  // existed, which fall back to deriving it from width (their old look).
+  height: z.number().optional(),
   rotation: z.number(),
   torn: z.boolean(),
   tornSeed: z.number().optional(),

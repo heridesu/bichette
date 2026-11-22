@@ -1,6 +1,7 @@
 ---
 import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { responsiveSrcSet } from '../../lib/images';
 
 export async function getStaticPaths() {
   const allEntries = await getCollection('entries');
@@ -32,13 +33,20 @@ const entries = rawEntries.sort((a, b) => b.data.date.valueOf() - a.data.date.va
     </header>
 
     <div class="collection__grid">
-      {entries.map((entry) => {
+      {entries.map((entry, i) => {
         const { title, type, image, imageAlt, aspect, caption } = entry.data;
         return (
           <a class="item" href={`/entries/${entry.slug}`}>
             {image && (
               <div class="item__frame" style={aspect ? `aspect-ratio: ${aspect};` : ''}>
-                <img src={image} alt={imageAlt ?? title ?? ''} loading="lazy" />
+                <img
+                  src={image}
+                  srcset={responsiveSrcSet(image)}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1020px) 50vw, 33vw"
+                  alt={imageAlt ?? title ?? ''}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  fetchpriority={i === 0 ? 'high' : undefined}
+                />
               </div>
             )}
             <div class="item__text">

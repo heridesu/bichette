@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import layout from '../data/homepage-layout.json';
+import { responsiveSrcSet } from '../lib/images';
 
 // The homepage is a deliberately art-directed composition, not a generic
 // grid. Its geometry lives in src/data/homepage-layout.json rather than
@@ -66,14 +67,27 @@ function tileAttrs(link: LinkSpec | undefined, entry: (typeof allEntries)[number
         class="collage collage--desktop"
         style={`aspect-ratio:${section.canvasWidth}/${section.canvasHeight};${i > 0 ? 'margin-top:3rem;' : ''}`}
       >
-        {section.tiles.map((item) => {
+        {section.tiles.map((item, ti) => {
           const entry = bySlug[item.slug];
           if (!entry) return null;
           const { tag: Tag, attrs, clickable } = tileAttrs(item.link as LinkSpec, entry);
           const style = `left:${item.left}%;top:${item.top}%;width:${item.width}%;height:${item.height}%;z-index:${item.z ?? 1};`;
+          // Only the first section is reliably above the fold — its
+          // tiles load promptly, everything after stays lazy. Only ONE
+          // image per page should be fetchpriority="high" (the LCP
+          // candidate), so that's reserved for just the very first tile.
+          const eager = i === 0;
+          const highPriority = i === 0 && ti === 0;
           return (
             <Tag class={`tile${clickable ? ' tile--clickable' : ''}`} style={style} {...(attrs as any)}>
-              <img src={entry.data.image} alt={entry.data.imageAlt ?? ''} loading="lazy" />
+              <img
+                src={entry.data.image}
+                srcset={entry.data.image ? responsiveSrcSet(entry.data.image) : undefined}
+                sizes="(max-width: 860px) 100vw, 50vw"
+                alt={entry.data.imageAlt ?? ''}
+                loading={eager ? 'eager' : 'lazy'}
+                fetchpriority={highPriority ? 'high' : undefined}
+              />
             </Tag>
           );
         })}
@@ -81,20 +95,29 @@ function tileAttrs(link: LinkSpec | undefined, entry: (typeof allEntries)[number
     ))}
 
     <div class="collage collage--mobile">
-      {layout.mobileSections.flatMap((section) => section.rows).map((row) => (
+      {layout.mobileSections.flatMap((section) => section.rows).map((row, i) => (
         <div class="collage__row">
-          {row.map((item) => {
+          {row.map((item, ti) => {
             const entry = bySlug[item.slug];
             if (!entry) return null;
             const { tag: Tag, attrs, clickable } = tileAttrs(item.link as LinkSpec, entry);
             const style = `width:${item.width}%;aspect-ratio:${item.aspect};`;
+            const eager = i === 0;
+            const highPriority = i === 0 && ti === 0;
             return (
               <Tag
                 class={`tile tile--mobile${clickable ? ' tile--clickable' : ''}${item.align ? ` tile--${item.align}` : ''}`}
                 style={style}
                 {...(attrs as any)}
               >
-                <img src={entry.data.image} alt={entry.data.imageAlt ?? ''} loading="lazy" />
+                <img
+                  src={entry.data.image}
+                  srcset={entry.data.image ? responsiveSrcSet(entry.data.image) : undefined}
+                  sizes={`${item.width}vw`}
+                  alt={entry.data.imageAlt ?? ''}
+                  loading={eager ? 'eager' : 'lazy'}
+                  fetchpriority={highPriority ? 'high' : undefined}
+                />
               </Tag>
             );
           })}
