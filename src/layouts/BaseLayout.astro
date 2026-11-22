@@ -1,0 +1,28 @@
+---
+import Nav from '../components/Nav.astro';
+import Lightbox from '../components/Lightbox.astro';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'bichette' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content="A personal archive of photographs, visual inspiration, favorite things, observations, and occasional essays." />
+  </head>
+  <body>
+    <Nav />
+    <main>
+      <slot />
+    </main>
+    <Lightbox />
+  </body>
+</html>

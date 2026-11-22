@@ -1,0 +1,245 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Figure from '../../components/Figure.astro';
+import FigureGrid from '../../components/FigureGrid.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('entries');
+  return entries.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<'entries'>;
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+const { title, image, imageAlt, aspect, caption, location, url, tags } = entry.data;
+
+// Two experiences sharing one template, not two separate page types:
+// an entry with no body text at all (most single-photo entries) gets a
+// restrained, gallery-label treatment; anything with actual writing,
+// multiple figures, a list, etc. gets the fuller article treatment.
+// What decides it is only how much is actually there — nothing here is
+// hand-assigned per entry.
+//
+// `date` exists on every entry (it's what sorts the homepage and
+// collections) but is never displayed here — only content the user
+// actually wrote (title, location, caption, body, tags) appears on the
+// page itself.
+const hasBody = entry.body.trim().length > 0;
+const isMinimal = !hasBody;
+---
+
+<BaseLayout title={title ? `${title} — bichette` : 'bichette'}>
+  {isMinimal ? (
+    <article class="wrap entry-minimal">
+      {title && <p class="entry-minimal__title">{title}</p>}
+
+      {image && (
+        <div class="entry-minimal__frame" style={aspect ? `aspect-ratio: ${aspect};` : ''}>
+          <img src={image} alt={imageAlt ?? title ?? ''} loading="eager" />
+        </div>
+      )}
+
+      {caption && <p class="entry-minimal__caption">{caption}</p>}
+      {location && <p class="entry-minimal__meta">{location}</p>}
+
+      {url && (
+        <a class="entry-minimal__visit" href={url} target="_blank" rel="noopener noreferrer">
+          visit the source ↗
+        </a>
+      )}
+
+      {tags && tags.length > 0 && (
+        <ul class="entry-minimal__tags">
+          {tags.map((tag) => <li>{tag}</li>)}
+        </ul>
+      )}
+    </article>
+  ) : (
+    <article class="wrap entry-page">
+      {title && <h1 class="entry-page__title">{title}</h1>}
+      {location && <p class="entry-page__location">{location}</p>}
+
+      {image && (
+        <Figure src={image} alt={imageAlt ?? title ?? ''} aspect={aspect} caption={caption} size="hero" />
+      )}
+
+      {!image && caption && <p class="entry-page__standalone-caption">{caption}</p>}
+
+      <div class="entry-page__body">
+        <Content components={{ Figure, FigureGrid }} />
+      </div>
+
+      {url && (
+        <a class="entry-page__visit" href={url} target="_blank" rel="noopener noreferrer">
+          visit the source ↗
+        </a>
+      )}
+
+      {tags && tags.length > 0 && (
+        <ul class="entry-page__tags">
+          {tags.map((tag) => <li>{tag}</li>)}
+        </ul>
+      )}
+    </article>
+  )}
+</BaseLayout>
+
+<style>
+  /* Minimal mode: one photograph (or object), generous whitespace, a
+     quiet label instead of an article header. The image shows whole
+     (object-fit: contain) rather than cropped to a frame, since there's
+     no grid to fit into here. */
+  .entry-minimal {
+    max-width: 44rem;
+    padding-top: 4rem;
+    padding-bottom: 7rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .entry-minimal__title {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+    margin-bottom: 2rem;
+  }
+
+  .entry-minimal__frame {
+    width: 100%;
+    max-height: 78vh;
+    aspect-ratio: 3 / 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .entry-minimal__frame img {
+    width: 100%;
+    height: 100%;
+    max-height: 78vh;
+    object-fit: contain;
+    display: block;
+  }
+
+  .entry-minimal__caption {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    max-width: 32rem;
+  }
+
+  .entry-minimal__meta {
+    margin-top: 1.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .entry-minimal__visit {
+    display: inline-block;
+    margin-top: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+
+  .entry-minimal__tags {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    text-transform: lowercase;
+  }
+
+  /* Richer mode: title, writing, possibly multiple figures — the fuller
+     article treatment. */
+  .entry-page {
+    max-width: 48rem;
+    padding-top: 2.5rem;
+    padding-bottom: 5rem;
+  }
+
+  .entry-page__title {
+    font-family: var(--font-serif);
+    font-size: 1.9rem;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+  }
+
+  .entry-page__location {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    margin-bottom: 0.5rem;
+  }
+
+  .entry-page__standalone-caption {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin: 1.25rem 0;
+  }
+
+  .entry-page__body {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    line-height: 1.65;
+  }
+
+  .entry-page__body :global(p) {
+    margin: 1rem 0 0;
+  }
+
+  .entry-page__body :global(p:first-child) {
+    margin-top: 0;
+  }
+
+  .entry-page__body :global(ul),
+  .entry-page__body :global(ol) {
+    margin: 1rem 0 0;
+    padding-left: 1.3rem;
+  }
+
+  .entry-page__visit {
+    display: inline-block;
+    margin-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+
+  .entry-page__tags {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 2rem 0 0;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    text-transform: lowercase;
+  }
+
+  @media (max-width: 560px) {
+    .entry-minimal {
+      padding-top: 2.5rem;
+      padding-bottom: 4rem;
+    }
+  }
+</style>

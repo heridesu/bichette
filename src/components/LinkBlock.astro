@@ -1,0 +1,62 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  entry: CollectionEntry<'entries'>;
+}
+
+const { entry } = Astro.props;
+const { title, url, source, caption } = entry.data;
+const { Content } = await entry.render();
+---
+
+<a class="link" href={url} target="_blank" rel="noopener noreferrer">
+  <span class="eyebrow link__eyebrow">found{source ? ` — ${source}` : ''}</span>
+  <span class="link__title">{title}</span>
+  {caption && <span class="link__caption">{caption}</span>}
+  <div class="link__body"><Content /></div>
+  <span class="link__arrow" aria-hidden="true">→</span>
+</a>
+
+<style>
+  .link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    text-decoration: none;
+    position: relative;
+  }
+
+  .link__eyebrow {
+    margin: 0;
+  }
+
+  .link__title {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    padding-right: 1.5rem;
+  }
+
+  .link__caption {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+
+  .link__body {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+
+  .link__body :global(p) {
+    margin: 0;
+  }
+
+  .link__arrow {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    color: var(--ink-faint);
+  }
+</style>

@@ -1,0 +1,51 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  entry: CollectionEntry<'entries'>;
+}
+
+const { entry } = Astro.props;
+const { title, date } = entry.data;
+const { Content } = await entry.render();
+
+const formattedDate = date.toLocaleDateString('en-US', {
+  month: 'short',
+  year: 'numeric',
+});
+---
+
+<article class="essay">
+  <span class="eyebrow">essay — {formattedDate}</span>
+  {title && <h2 class="essay__title">{title}</h2>}
+  <div class="essay__body"><Content /></div>
+</article>
+
+<style>
+  .essay {
+    padding: 1.1rem 1.2rem;
+    background: #fff;
+    border: 1px solid var(--line);
+  }
+
+  .essay__title {
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
+    line-height: 1.25;
+    margin: 0.4rem 0 0.6rem;
+  }
+
+  .essay__body {
+    font-family: var(--font-serif);
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+
+  .essay__body :global(p) {
+    margin: 0.7rem 0 0;
+  }
+
+  .essay__body :global(p:first-child) {
+    margin-top: 0;
+  }
+</style>

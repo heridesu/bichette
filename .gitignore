@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+
+# Bichette Studio — the local editor and its filesystem-writing API routes.
+# Never committed, so a fresh clone (Vercel's build included) never has
+# them; astro.config.mjs detects their absence and builds a plain static
+# site instead. See src/pages/studio/ and src/pages/api/studio/.
+src/pages/studio/
+src/pages/api/studio/

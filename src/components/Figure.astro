@@ -1,0 +1,71 @@
+---
+// Usable both as the lead image on an entry page and inline inside an
+// MDX body (directly, or inside <FigureGrid>) — the same building block
+// either way, just with a different `size`.
+interface Props {
+  src: string;
+  alt?: string;
+  caption?: string;
+  aspect?: string;
+  size?: 'hero' | 'inline';
+  href?: string;
+  /** Percentage width within its column; omitted/100 = full width. */
+  width?: number;
+}
+
+const { src, alt = '', caption, aspect, size = 'inline', href, width } = Astro.props;
+const Wrap = href ? 'a' : 'div';
+const narrow = typeof width === 'number' && width < 100;
+---
+
+<figure class={`figure figure--${size}${narrow ? ' figure--narrow' : ''}`} style={narrow ? `width: ${width}%;` : ''}>
+  <Wrap class="figure__frame" style={aspect ? `aspect-ratio: ${aspect};` : ''} {...(href ? { href, target: href.startsWith('http') ? '_blank' : undefined, rel: href.startsWith('http') ? 'noopener noreferrer' : undefined } : {})}>
+    <img src={src} alt={alt} loading="lazy" />
+  </Wrap>
+  {caption && <figcaption class="figure__caption">{caption}</figcaption>}
+</figure>
+
+<style>
+  .figure {
+    margin: 1.5rem 0;
+  }
+
+  .figure--narrow {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .figure__frame {
+    display: block;
+    overflow: hidden;
+    background: var(--line);
+    /* Fallback for when no `aspect` is supplied (e.g. an upload whose
+       dimensions weren't captured) — without this, the img's height:100%
+       has no basis to resolve against and the figure collapses to
+       nothing, so the image silently fails to show. */
+    aspect-ratio: 3 / 2;
+  }
+
+  a.figure__frame:hover img {
+    opacity: 0.88;
+  }
+
+  .figure__frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.2s ease;
+  }
+
+  .figure--hero .figure__frame {
+    max-height: 85vh;
+  }
+
+  .figure__caption {
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+</style>

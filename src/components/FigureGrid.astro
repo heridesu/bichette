@@ -1,0 +1,48 @@
+---
+// Lets an entry body break out of a single vertical column — a few
+// <Figure> images side by side instead of stacked, or (cols={1}) a
+// deliberate vertical stack when that's the composition you want.
+// Used directly inside MDX bodies:
+// <FigureGrid cols={3}><Figure .../><Figure .../></FigureGrid>
+interface Props {
+  cols?: 1 | 2 | 3 | 4;
+}
+
+const { cols = 2 } = Astro.props;
+---
+
+<div class="figure-grid" data-cols={cols}>
+  <slot />
+</div>
+
+<style>
+  .figure-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .figure-grid[data-cols='1'] {
+    grid-template-columns: 1fr;
+  }
+
+  .figure-grid[data-cols='3'] {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .figure-grid[data-cols='4'] {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .figure-grid :global(figure.figure) {
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .figure-grid[data-cols='3'],
+    .figure-grid[data-cols='4'] {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>

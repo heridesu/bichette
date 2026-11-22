@@ -1,0 +1,36 @@
+{
+  "name": "bichette",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "publish": "git add -A && git commit -m \"Update site\" && git push"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^3.1.9",
+    "@astrojs/node": "^8.3.4",
+    "@astrojs/react": "^3.6.3",
+    "astro": "^4.16.11",
+    "image-size": "^2.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-rnd": "^10.5.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@types/node": "^26.6.6",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "typescript": "^5.6.3"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "sharp@0.33.5": true,
+    "fsevents@2.3.3": true
+  }
+}

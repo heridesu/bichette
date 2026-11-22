@@ -1,0 +1,46 @@
+---
+// Shared rendering for the short text types: note, observation, curiosity.
+// They differ only in their eyebrow label — kept as one component so a
+// future new "type" of short text doesn't need a new file, just a label.
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  entry: CollectionEntry<'entries'>;
+}
+
+const { entry } = Astro.props;
+const { title, type } = entry.data;
+const { Content } = await entry.render();
+---
+
+<article class="text">
+  <span class="eyebrow">{type}</span>
+  {title && <h3 class="text__title">{title}</h3>}
+  <div class="text__body"><Content /></div>
+</article>
+
+<style>
+  .text {
+    padding: 0.9rem 1rem;
+    border-left: 2px solid var(--line);
+  }
+
+  .text__title {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    margin: 0.3rem 0 0.4rem;
+  }
+
+  .text__body {
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+
+  .text__body :global(p) {
+    margin: 0.4rem 0 0;
+  }
+
+  .text__body :global(p:first-child) {
+    margin-top: 0.3rem;
+  }
+</style>

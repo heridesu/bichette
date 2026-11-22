@@ -1,0 +1,32 @@
+---
+// The only place that maps content "type" to a rendering component.
+// Adding a new type later means adding one case here, not touching
+// the homepage or the content itself.
+import type { CollectionEntry } from 'astro:content';
+import PhotoBlock from './PhotoBlock.astro';
+import LinkBlock from './LinkBlock.astro';
+import EssayBlock from './EssayBlock.astro';
+import TextBlock from './TextBlock.astro';
+
+interface Props {
+  entry: CollectionEntry<'entries'>;
+}
+
+const { entry } = Astro.props;
+---
+
+<div class="entry" data-type={entry.data.type}>
+  {entry.data.type === 'photo' && <PhotoBlock entry={entry} />}
+  {entry.data.type === 'link' && <LinkBlock entry={entry} />}
+  {entry.data.type === 'essay' && <EssayBlock entry={entry} />}
+  {(entry.data.type === 'note' || entry.data.type === 'observation' || entry.data.type === 'curiosity') && (
+    <TextBlock entry={entry} />
+  )}
+</div>
+
+<style>
+  .entry {
+    break-inside: avoid;
+    margin-bottom: var(--gutter);
+  }
+</style>

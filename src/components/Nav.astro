@@ -1,0 +1,89 @@
+---
+import { getCollection } from 'astro:content';
+
+// Deliberately sparse, matching the Paper homepage frame: a wordmark on
+// the left, "about" and "elsewhere" on the right. "elsewhere" is a real
+// link — it picks a random entry at click time from a list baked in at
+// build time, so it works on a fully static site with no server involved.
+const entries = await getCollection('entries');
+const destinations = entries.map((entry) => `/entries/${entry.slug}`);
+---
+
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a href="/" class="nav__mark">bichette</a>
+    <nav class="nav__links" aria-label="Sections">
+      <span class="nav__link nav__link--soon" title="Not built yet">about</span>
+      <a href="#" class="nav__link nav__link--elsewhere" id="elsewhere-link">elsewhere ↗</a>
+    </nav>
+  </div>
+</header>
+
+<script type="application/json" id="elsewhere-destinations" set:html={JSON.stringify(destinations)}></script>
+<script>
+  const link = document.getElementById('elsewhere-link');
+  const data = document.getElementById('elsewhere-destinations');
+  if (link && data) {
+    const destinations: string[] = JSON.parse(data.textContent || '[]');
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (destinations.length === 0) return;
+      const others = destinations.filter((href) => href !== window.location.pathname);
+      const pool = others.length > 0 ? others : destinations;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      window.location.href = pick;
+    });
+  }
+</script>
+
+<style>
+  .nav {
+    border-bottom: 1px solid var(--line);
+    padding: 1.4rem 0;
+  }
+
+  .nav__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1.5rem;
+  }
+
+  .nav__mark {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+  }
+
+  .nav__links {
+    display: flex;
+    gap: 1.1rem;
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .nav__link {
+    color: var(--ink-faint);
+    text-decoration: none;
+  }
+
+  .nav__link:hover {
+    color: var(--ink);
+  }
+
+  .nav__link--soon {
+    cursor: default;
+  }
+
+  .nav__link--soon:hover {
+    color: var(--ink-faint);
+  }
+
+  .nav__link--elsewhere {
+    cursor: pointer;
+  }
+</style>

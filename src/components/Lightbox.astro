@@ -1,0 +1,103 @@
+---
+// One shared full-screen image viewer, included once (in BaseLayout).
+// Anything on the page can trigger it by being a [data-lightbox-src]
+// element — used by homepage tiles whose "links to" is set to
+// "Full image" rather than a real navigation.
+---
+
+<div class="lightbox" id="lightbox" aria-hidden="true">
+  <button class="lightbox__close" id="lightbox-close" aria-label="Close">✕</button>
+  <img class="lightbox__img" id="lightbox-img" alt="" />
+</div>
+
+<script>
+  const overlay = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img') as HTMLImageElement | null;
+  const closeBtn = document.getElementById('lightbox-close');
+
+  function open(src: string, alt: string) {
+    if (!img || !overlay) return;
+    img.src = src;
+    img.alt = alt;
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    if (!img || !overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    img.src = '';
+  }
+
+  document.querySelectorAll('[data-lightbox-src]').forEach((el) => {
+    const trigger = () => {
+      const src = el.getAttribute('data-lightbox-src');
+      const alt = el.getAttribute('data-lightbox-alt') ?? '';
+      if (src) open(src, alt);
+    };
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      trigger();
+    });
+    el.addEventListener('keydown', (e) => {
+      const key = (e as KeyboardEvent).key;
+      if (key === 'Enter' || key === ' ') {
+        e.preventDefault();
+        trigger();
+      }
+    });
+  });
+
+  overlay?.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  closeBtn?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+</script>
+
+<style>
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 10, 0.94);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 2rem;
+  }
+
+  .lightbox.is-open {
+    display: flex;
+  }
+
+  .lightbox__img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .lightbox__close {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 0.5rem;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  .lightbox__close:hover {
+    opacity: 0.8;
+  }
+</style>
