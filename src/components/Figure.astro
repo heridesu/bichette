@@ -11,15 +11,21 @@ interface Props {
   href?: string;
   /** Percentage width within its column; omitted/100 = full width. */
   width?: number;
+  /** A thin black line at the frame's outer edge. */
+  border?: boolean;
+  /** White padding between the image and the frame's edge — a mat/passe-partout.
+      Combines with `border` (the border draws around the mat, not the image). */
+  mat?: boolean;
 }
 
-const { src, alt = '', caption, aspect, size = 'inline', href, width } = Astro.props;
+const { src, alt = '', caption, aspect, size = 'inline', href, width, border, mat } = Astro.props;
 const Wrap = href ? 'a' : 'div';
 const narrow = typeof width === 'number' && width < 100;
+const frameClass = `figure__frame${border ? ' figure__frame--bordered' : ''}${mat ? ' figure__frame--matted' : ''}`;
 ---
 
 <figure class={`figure figure--${size}${narrow ? ' figure--narrow' : ''}`} style={narrow ? `width: ${width}%;` : ''}>
-  <Wrap class="figure__frame" style={aspect ? `aspect-ratio: ${aspect};` : ''} {...(href ? { href, target: href.startsWith('http') ? '_blank' : undefined, rel: href.startsWith('http') ? 'noopener noreferrer' : undefined } : {})}>
+  <Wrap class={frameClass} style={aspect ? `aspect-ratio: ${aspect};` : ''} {...(href ? { href, target: href.startsWith('http') ? '_blank' : undefined, rel: href.startsWith('http') ? 'noopener noreferrer' : undefined } : {})}>
     <img src={src} alt={alt} loading="lazy" />
   </Wrap>
   {caption && <figcaption class="figure__caption">{caption}</figcaption>}
@@ -60,6 +66,16 @@ const narrow = typeof width === 'number' && width < 100;
 
   .figure--hero .figure__frame {
     max-height: 85vh;
+  }
+
+  .figure__frame--bordered {
+    border: 2px solid var(--ink);
+  }
+
+  .figure__frame--matted {
+    box-sizing: border-box;
+    padding: 14px;
+    background: #fff;
   }
 
   .figure__caption {

@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { Block, EntryType, PageData, PageSummary } from './types';
+import type { Block, CollageData, EntryType, PageData, PageSummary } from './types';
+import CollageEditor from './CollageEditor';
+
+// One section the same size as the homepage's own default section
+// (DesktopEditor's addSection()) — a collage page should feel like the
+// same spacious working area, not a cramped square. More room always
+// means adding another section, never resizing this one.
+const DEFAULT_COLLAGE: CollageData = {
+  sections: [{ canvasWidth: 1440, canvasHeight: 900, tiles: [], tape: [], tacks: [] }],
+};
 
 const TYPES: EntryType[] = ['photo', 'note', 'link', 'essay', 'observation', 'curiosity'];
 
@@ -193,7 +202,7 @@ export default function PagesEditor() {
         ))}
       </div>
 
-      <div className="studio__main" style={{ maxWidth: 640 }}>
+      <div className="studio__main">
         {creating ? (
           <div className="studio__grid2" style={{ maxWidth: 420 }}>
             <div className="studio__field">
@@ -250,10 +259,25 @@ export default function PagesEditor() {
               </button>
             </div>
 
-            <FieldForm page={current} onChange={patch} />
+            <div style={{ maxWidth: 640 }}>
+              <FieldForm page={current} onChange={patch} />
+            </div>
 
-            <h3 style={{ marginTop: '2rem' }}>Content</h3>
-            <BlockEditor blocks={current.blocks} onChange={patchBlocks} />
+            {current.template === 'collage' ? (
+              <>
+                <h3 style={{ marginTop: '2rem' }}>Collage layout</h3>
+                <CollageEditor
+                  collage={current.collage ?? DEFAULT_COLLAGE}
+                  onChange={(collage) => patch({ collage })}
+                  onUpload={uploadAsset}
+                />
+              </>
+            ) : (
+              <div style={{ maxWidth: 640 }}>
+                <h3 style={{ marginTop: '2rem' }}>Content</h3>
+                <BlockEditor blocks={current.blocks} onChange={patchBlocks} />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -277,6 +301,19 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
               {t}
             </option>
           ))}
+        </select>
+      </div>
+      <div className="studio__field">
+        <label>Template</label>
+        <select
+          value={page.template ?? 'standard'}
+          onChange={(e) => {
+            const template = e.target.value as 'standard' | 'collage';
+            onChange({ template, collage: template === 'collage' ? page.collage ?? DEFAULT_COLLAGE : page.collage });
+          }}
+        >
+          <option value="standard">Standard</option>
+          <option value="collage">Collage (drag &amp; drop)</option>
         </select>
       </div>
       <div className="studio__field">
@@ -500,6 +537,14 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
             <option value={30}>Small (30%)</option>
           </select>
         </div>
+        <label style={{ fontSize: '0.72rem', color: '#666', display: 'block', marginTop: '0.4rem' }}>
+          <input type="checkbox" checked={block.border ?? false} onChange={(e) => onChange({ ...block, border: e.target.checked || undefined })} />{' '}
+          Thin black border
+        </label>
+        <label style={{ fontSize: '0.72rem', color: '#666', display: 'block' }}>
+          <input type="checkbox" checked={block.mat ?? false} onChange={(e) => onChange({ ...block, mat: e.target.checked || undefined })} />{' '}
+          White mat/padding
+        </label>
       </div>
     );
   }

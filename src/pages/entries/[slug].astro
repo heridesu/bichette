@@ -3,6 +3,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Figure from '../../components/Figure.astro';
 import FigureGrid from '../../components/FigureGrid.astro';
+import { itemZ, tapeClipPath, youtubeEmbedId } from '../../lib/decorations';
 
 export async function getStaticPaths() {
   const entries = await getCollection('entries');
@@ -33,10 +34,71 @@ const { title, image, imageAlt, aspect, caption, location, url, tags } = entry.d
 // page itself.
 const hasBody = entry.body.trim().length > 0;
 const isMinimal = !hasBody;
+const collage = entry.data.template === 'collage' ? entry.data.collage : undefined;
+
+// A collage tile is only ever a link when its own `href` is set (unlike
+// the homepage, there's no per-tile link-type to choose from) — same
+// external-link handling as the homepage's own tileAttrs().
+function tileWrapper(href: string | undefined) {
+  if (!href) return { tag: 'div' as const, attrs: {} };
+  const external = href.startsWith('http');
+  return {
+    tag: 'a' as const,
+    attrs: { href, target: external ? '_blank' : undefined, rel: external ? 'noopener noreferrer' : undefined },
+  };
+}
 ---
 
 <BaseLayout title={title ? `${title} — bichette` : 'bichette'}>
-  {isMinimal ? (
+  {collage ? (
+    <div class="wrap collage-page">
+      {title && <h1 class="collage-page__title">{title}</h1>}
+      {collage.sections.map((section, i) => (
+        <div
+          class="deco-canvas"
+          style={`aspect-ratio:${section.canvasWidth}/${section.canvasHeight};${i > 0 ? 'margin-top:3rem;' : ''}`}
+        >
+          {section.tiles.map((tile) => {
+            const { tag: Tag, attrs } = tileWrapper(tile.href);
+            return (
+              <Tag
+                class={`deco-tile${tile.href ? ' deco-tile--linked' : ''}${tile.border ? ' deco-tile--bordered' : ''}${tile.mat ? ' deco-tile--matted' : ''}`}
+                style={`left:${tile.left}%;top:${tile.top}%;width:${tile.width}%;height:${tile.height}%;z-index:${itemZ('tile', tile)};`}
+                {...(attrs as any)}
+              >
+                {tile.kind === 'image' && <img src={tile.src} alt={tile.alt ?? ''} loading="lazy" />}
+                {tile.kind === 'video' && <video src={tile.src} controls playsinline preload="metadata" />}
+                {tile.kind === 'youtube' && tile.url && (
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${youtubeEmbedId(tile.url)}`}
+                    title="YouTube video"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen
+                  />
+                )}
+                {tile.kind === 'text' && <div class="deco-tile__text">{tile.text}</div>}
+              </Tag>
+            );
+          })}
+          {section.tape.map((piece) => (
+            <div
+              class="deco-tape"
+              style={`left:${piece.left}%;top:${piece.top}%;width:${piece.width}%;z-index:${itemZ('tape', piece)};--tape-color:${piece.color};transform:rotate(${piece.rotation}deg);clip-path:${tapeClipPath(piece.torn, piece.tornSeed)};`}
+            />
+          ))}
+          {section.tacks.map((tack) => (
+            <img
+              class="deco-tack"
+              src="/decorations/tack-silver.png"
+              alt=""
+              style={`left:${tack.left}%;top:${tack.top}%;z-index:${itemZ('tack', tack)};`}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  ) : isMinimal ? (
     <article class="wrap entry-minimal">
       {title && <p class="entry-minimal__title">{title}</p>}
 
@@ -241,5 +303,18 @@ const isMinimal = !hasBody;
       padding-top: 2.5rem;
       padding-bottom: 4rem;
     }
+  }
+
+  .collage-page {
+    max-width: 56rem;
+    padding-top: 2.5rem;
+    padding-bottom: 5rem;
+  }
+
+  .collage-page__title {
+    font-family: var(--font-serif);
+    font-size: 1.9rem;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
   }
 </style>

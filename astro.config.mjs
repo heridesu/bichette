@@ -14,7 +14,7 @@ import node from '@astrojs/node';
 const studioPresent = existsSync(fileURLToPath(new URL('./src/pages/studio', import.meta.url)));
 
 export default defineConfig({
-  site: 'https://example.com',
+  site: 'https://bichette.vercel.app',
   output: studioPresent ? 'hybrid' : 'static',
   adapter: studioPresent ? node({ mode: 'standalone' }) : undefined,
   integrations: studioPresent ? [mdx(), react()] : [mdx()],

@@ -1,5 +1,74 @@
 import { defineCollection, z } from 'astro:content';
 
+// A collage-template page is a freeform canvas — the same drag-and-drop
+// idea as the homepage, but scoped to one page's own content rather than
+// referencing other entries by slug. It supports the same content kinds
+// a Standard page's blocks do (image, video, YouTube, text), just freely
+// positioned instead of stacked in a column. Tape/tacks are purely
+// decorative scrapbook elements layered on top; `tornSeed` is generated
+// once when a torn piece is created and then persisted, so the jagged
+// edge it produces is stable (same piece always tears the same way)
+// instead of reshuffling on every render.
+const collageItemBase = {
+  id: z.string(),
+  left: z.number(),
+  top: z.number(),
+  width: z.number(),
+  height: z.number(),
+  z: z.number().optional(),
+  // A plain URL or an internal path like /entries/some-page — same
+  // free-form model Figure/FigureGrid's own `href` already uses.
+  href: z.string().optional(),
+  // Same thin-border / white-mat framing options as a Standard page's
+  // own Image block (see src/components/Figure.astro).
+  border: z.boolean().optional(),
+  mat: z.boolean().optional(),
+};
+
+const collageTile = z.discriminatedUnion('kind', [
+  z.object({ ...collageItemBase, kind: z.literal('image'), src: z.string(), alt: z.string().optional(), aspect: z.string().optional() }),
+  z.object({ ...collageItemBase, kind: z.literal('video'), src: z.string(), aspect: z.string().optional() }),
+  z.object({ ...collageItemBase, kind: z.literal('youtube'), url: z.string() }),
+  z.object({ ...collageItemBase, kind: z.literal('text'), text: z.string() }),
+]);
+
+const tapePiece = z.object({
+  id: z.string(),
+  color: z.string(),
+  left: z.number(),
+  top: z.number(),
+  width: z.number(),
+  rotation: z.number(),
+  torn: z.boolean(),
+  tornSeed: z.number().optional(),
+  z: z.number().optional(),
+});
+
+const tackPiece = z.object({
+  id: z.string(),
+  left: z.number(),
+  top: z.number(),
+  z: z.number().optional(),
+});
+
+// Independent, fixed-size work areas stacked vertically down the page —
+// the same idea as the homepage's own desktopSections. Making one
+// section's canvas bigger would stretch every tile already placed in it
+// (a tile's height is a % of its own canvas height), so more room means
+// adding a new section rather than resizing an existing one, exactly
+// like the homepage.
+const collageSection = z.object({
+  canvasWidth: z.number(),
+  canvasHeight: z.number(),
+  tiles: z.array(collageTile),
+  tape: z.array(tapePiece),
+  tacks: z.array(tackPiece),
+});
+
+const collageData = z.object({
+  sections: z.array(collageSection),
+});
+
 // A single "entries" collection holds every kind of thing that goes on the
 // site — a photograph, a short note, a link to something found elsewhere,
 // a longer essay, an observation, a curiosity. `type` decides which small
@@ -48,6 +117,12 @@ const entries = defineCollection({
     // choice about a given appearance, not a statement about the content
     // itself; the entry still gets its own full page either way.
     linked: z.boolean().optional(),
+
+    // 'standard' (default) renders the usual title/body/blocks article.
+    // 'collage' replaces that with a freeform drag-and-drop canvas — see
+    // `collageData` above.
+    template: z.enum(['standard', 'collage']).optional(),
+    collage: collageData.optional(),
   }),
 });
 

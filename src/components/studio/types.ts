@@ -41,6 +41,76 @@ export interface Layout {
   mobileSections: MobileSection[];
 }
 
+interface CollageItemBase {
+  id: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  z?: number;
+  href?: string;
+  /** A thin black line at the tile's outer edge. */
+  border?: boolean;
+  /** White padding between the content and the tile's edge — a mat/passe-partout. */
+  mat?: boolean;
+}
+
+export interface CollageImageItem extends CollageItemBase {
+  kind: 'image';
+  src: string;
+  alt?: string;
+  aspect?: string;
+}
+
+export interface CollageVideoItem extends CollageItemBase {
+  kind: 'video';
+  src: string;
+  aspect?: string;
+}
+
+export interface CollageYouTubeItem extends CollageItemBase {
+  kind: 'youtube';
+  url: string;
+}
+
+export interface CollageTextItem extends CollageItemBase {
+  kind: 'text';
+  text: string;
+}
+
+export type CollageTile = CollageImageItem | CollageVideoItem | CollageYouTubeItem | CollageTextItem;
+
+export interface TapePiece {
+  id: string;
+  color: string;
+  left: number;
+  top: number;
+  width: number;
+  rotation: number;
+  torn: boolean;
+  tornSeed?: number;
+  z?: number;
+}
+
+export interface TackPiece {
+  id: string;
+  left: number;
+  top: number;
+  z?: number;
+}
+
+export interface CollageSection {
+  canvasWidth: number;
+  canvasHeight: number;
+  tiles: CollageTile[];
+  tape: TapePiece[];
+  tacks: TackPiece[];
+}
+
+export interface CollageData {
+  sections: CollageSection[];
+}
+
 export interface EntryInfo {
   slug: string;
   title: string | null;
@@ -64,6 +134,10 @@ export interface ImageBlock {
   href?: string;
   /** Percentage width within the body column; omitted/100 = full width. */
   width?: number;
+  /** A thin black line at the frame's outer edge. */
+  border?: boolean;
+  /** White padding between the image and the frame's edge — a mat/passe-partout. */
+  mat?: boolean;
 }
 export interface ImageGridBlock {
   type: 'imagegrid';
@@ -120,4 +194,6 @@ export interface PageData {
   tags?: string[];
   collections?: string[];
   blocks: Block[];
+  template?: 'standard' | 'collage';
+  collage?: CollageData;
 }
