@@ -57,12 +57,13 @@ const tackPiece = z.object({
   z: z.number().optional(),
 });
 
-// Independent, fixed-size work areas stacked vertically down the page —
-// the same idea as the homepage's own desktopSections. Making one
-// section's canvas bigger would stretch every tile already placed in it
-// (a tile's height is a % of its own canvas height), so more room means
-// adding a new section rather than resizing an existing one, exactly
-// like the homepage.
+// Independent work areas stacked vertically down the page — the same
+// idea as the homepage's own desktopSections. A section's canvasHeight
+// is freely resizable in Studio (CollageEditor rescales every tile/tape/
+// tack's stored top & height by the old/new ratio when it changes, so
+// existing content keeps its exact pixel position instead of stretching)
+// — "Add section" is for a deliberate hard break between groups, not the
+// only way to get more room.
 const collageSection = z.object({
   canvasWidth: z.number(),
   canvasHeight: z.number(),

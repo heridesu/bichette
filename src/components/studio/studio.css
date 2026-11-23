@@ -121,6 +121,21 @@
   margin-top: 0;
 }
 
+.studio__section-height {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.studio__section-height input {
+  width: 5rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+}
+
 .studio__canvas {
   position: relative;
   background: repeating-conic-gradient(#eee 0% 25%, #f6f6f4 0% 50%) 50% / 20px 20px;

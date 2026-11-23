@@ -21,6 +21,11 @@ interface Props {
 
 export default function CollageEditor({ collage, onChange, onUpload }: Props) {
   const [selected, setSelected] = useState<Selected>(null);
+  // Which section (if any) is showing its "remove this and everything in
+  // it?" prompt — removing a section is a single click when it's already
+  // empty, but anything with real content needs this one extra step
+  // first, same as the page-level "Delete page" confirmation below.
+  const [confirmingRemoveSection, setConfirmingRemoveSection] = useState<number | null>(null);
 
   // Several flows (upload-then-patch, bring-forward-then-...) call
   // onChange and then, after an `await`, need to read the result of that
@@ -113,10 +118,32 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
 
   function removeSection(sectionIndex: number) {
     const current = collageRef.current;
-    const s = current.sections[sectionIndex];
-    if (s.tiles.length > 0 || s.tape.length > 0 || s.tacks.length > 0) return;
     onChange({ ...current, sections: current.sections.filter((_, i) => i !== sectionIndex) });
     if (selected?.section === sectionIndex) setSelected(null);
+    setConfirmingRemoveSection(null);
+  }
+
+  // Every vertical position/size (tile top & height, tape top & height,
+  // tack top) is stored as a percentage of the section's OWN
+  // canvasHeight — so just changing canvasHeight would stretch the whole
+  // composition instead of simply opening up more room. Rescaling every
+  // existing value by the old/new ratio keeps each piece at exactly the
+  // same pixel position and size, so growing the canvas only adds empty
+  // space at the bottom to drop new content into (and shrinking it packs
+  // everything back down, rather than clipping or distorting it).
+  function resizeSectionHeight(sectionIndex: number, newHeight: number) {
+    const clamped = Math.max(200, Math.round(newHeight));
+    patchSection(sectionIndex, (s) => {
+      if (clamped === s.canvasHeight) return s;
+      const scale = s.canvasHeight / clamped;
+      return {
+        ...s,
+        canvasHeight: clamped,
+        tiles: s.tiles.map((t) => ({ ...t, top: t.top * scale, height: t.height * scale }) as CollageTile),
+        tape: s.tape.map((t) => ({ ...t, top: t.top * scale, height: t.height !== undefined ? t.height * scale : t.height })),
+        tacks: s.tacks.map((t) => ({ ...t, top: t.top * scale })),
+      };
+    });
   }
 
   // Stacking order is scoped to one section — it's never meaningful to
@@ -305,22 +332,42 @@ export default function CollageEditor({ collage, onChange, onUpload }: Props) {
       <div className="studio__main">
         {collage.sections.map((section, si) => {
           const heightPx = CANVAS_PX * (section.canvasHeight / section.canvasWidth);
-          const empty = section.tiles.length === 0 && section.tape.length === 0 && section.tacks.length === 0;
+          const itemCount = section.tiles.length + section.tape.length + section.tacks.length;
           return (
             <div key={si} style={{ marginBottom: '2.5rem' }}>
               <div className="studio__section-header">
-                <span>
-                  Section {si + 1} — {section.canvasWidth}×{section.canvasHeight}
-                </span>
-                <div className="studio__spacer" />
-                <button
-                  className="studio__btn studio__btn--danger"
-                  disabled={!empty}
-                  title={empty ? 'Remove this section' : 'Remove every item from this section first'}
-                  onClick={() => removeSection(si)}
-                >
-                  Remove section
+                <span>Section {si + 1}</span>
+                <label className="studio__section-height">
+                  Height (px)
+                  <input
+                    type="number"
+                    step={100}
+                    min={200}
+                    value={section.canvasHeight}
+                    onChange={(e) => resizeSectionHeight(si, parseInt(e.target.value, 10) || section.canvasHeight)}
+                  />
+                </label>
+                <button className="studio__btn" onClick={() => resizeSectionHeight(si, section.canvasHeight + 300)}>
+                  Make longer
                 </button>
+                <div className="studio__spacer" />
+                {confirmingRemoveSection === si ? (
+                  <>
+                    <span className="studio__status">
+                      Remove this section{itemCount > 0 ? ` and its ${itemCount} item${itemCount === 1 ? '' : 's'}` : ''}?
+                    </span>
+                    <button className="studio__btn studio__btn--danger" onClick={() => removeSection(si)}>
+                      Yes, remove
+                    </button>
+                    <button className="studio__btn" onClick={() => setConfirmingRemoveSection(null)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button className="studio__btn studio__btn--danger" onClick={() => setConfirmingRemoveSection(si)}>
+                    Remove section
+                  </button>
+                )}
               </div>
 
               <div className="studio__collage-toolbar">
