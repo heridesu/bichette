@@ -27,6 +27,11 @@ export default function FocalPointPicker({ src, focalX = 50, focalY = 50, onChan
     <div className={`studio__focal-picker${compact ? ' studio__focal-picker--compact' : ''}`}>
       <img src={thumbSrc(src)} alt="" draggable={false} onClick={handleClick} />
       <div className="studio__focal-marker" style={{ left: `${focalX}%`, top: `${focalY}%` }} />
+      {!compact && (
+        <p className="studio__field-hint" style={{ marginTop: '0.3rem' }}>
+          Click to choose what shows in this frame — shifts the crop, doesn&rsquo;t zoom or touch the original photo.
+        </p>
+      )}
     </div>
   );
 }

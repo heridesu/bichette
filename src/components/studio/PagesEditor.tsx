@@ -7,6 +7,7 @@ import { applyTemplate, convertPageToCollage, type CollageTemplate, type Templat
 import { thumbSrc } from '../../lib/images';
 import FocalPointPicker from './FocalPointPicker';
 import PageStylePicker from './PageStylePicker';
+import MediaLibraryPicker from './MediaLibraryPicker';
 
 // One section the same size as the homepage's own default section
 // (DesktopEditor's addSection()) — a collage page should feel like the
@@ -725,6 +726,11 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
 
       <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
         <label>Lead image</label>
+        <p className="studio__field-hint">
+          {(page.template ?? 'standard') === 'standard'
+            ? 'Shows as the big photo at the top of this page, and doubles as its thumbnail in the Studio page list and on the homepage/collections grid.'
+            : "Not shown on the page itself — this template has its own images on the canvas. Used only as this page's thumbnail in the Studio page list and on the homepage/collections grid."}
+        </p>
         {page.image && <img src={thumbSrc(page.image)} alt="" className="studio__thumb" style={{ marginBottom: '0.5rem' }} />}
         <input
           type="file"
@@ -735,6 +741,9 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
             e.currentTarget.value = '';
           }}
         />
+        <div style={{ marginTop: '0.5rem' }}>
+          <MediaLibraryPicker onSelect={(src, aspect) => onChange({ image: src, aspect: aspect ?? page.aspect })} />
+        </div>
         {page.image && (
           <button className="studio__btn" style={{ marginTop: '0.5rem' }} onClick={() => onChange({ image: undefined, aspect: undefined })}>
             Remove lead image
@@ -757,6 +766,9 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
               e.currentTarget.value = '';
             }}
           />
+          <div style={{ marginTop: '0.5rem' }}>
+            <MediaLibraryPicker onSelect={(src) => onChange({ detailImage: src })} />
+          </div>
           <input
             placeholder="Alt text (optional)"
             style={{ marginTop: '0.5rem' }}
@@ -925,6 +937,10 @@ function BlockEditor({
     onChange([...blocks, block]);
   }
 
+  function addImageFromLibrary(src: string, aspect: string | undefined) {
+    add({ type: 'image', src, aspect });
+  }
+
   // "+ Image" adds one fully-formed Image block per file picked, instead
   // of one empty block the user then has to fill in one at a time — a
   // preview blob shows immediately, swapped for the real uploaded path
@@ -987,6 +1003,7 @@ function BlockEditor({
             }}
           />
         </label>
+        <MediaLibraryPicker label="+ Image from Library" onSelect={addImageFromLibrary} />
         <button className="studio__btn" onClick={() => add({ type: 'imagegrid', cols: 2, images: [] })}>
           + Image grid
         </button>
@@ -1079,6 +1096,10 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
             e.currentTarget.value = '';
           }}
         />
+        <MediaLibraryPicker
+          label={block.src ? '…or choose a different one from Library' : '+ Choose from Library'}
+          onSelect={(src, aspect) => onChange({ ...block, src, aspect: aspect ?? block.aspect })}
+        />
         <input placeholder="Alt text" value={block.alt ?? ''} onChange={(e) => onChange({ ...block, alt: e.target.value || undefined })} />
         <input
           placeholder="Caption (optional)"
@@ -1113,11 +1134,12 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
             Thickness (px)
             <input
               type="number"
-              min={1}
+              min={0.5}
               max={10}
+              step={0.5}
               style={{ width: '4rem', padding: '0.2rem 0.3rem', border: '1px solid #ccc', borderRadius: 4 }}
               value={block.borderWidth ?? 2}
-              onChange={(e) => onChange({ ...block, borderWidth: parseInt(e.target.value, 10) || 2 })}
+              onChange={(e) => onChange({ ...block, borderWidth: parseFloat(e.target.value) || 2 })}
             />
           </label>
         )}
@@ -1278,6 +1300,13 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
               });
               URL.revokeObjectURL(previewUrl);
             }
+          }}
+        />
+        <MediaLibraryPicker
+          label="+ Add from Library"
+          onSelect={(src) => {
+            const current = blockRef.current as typeof block;
+            onChange({ ...current, images: [...current.images, { src }] });
           }}
         />
       </div>

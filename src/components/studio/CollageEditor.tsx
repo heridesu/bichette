@@ -16,10 +16,16 @@ import {
 } from '../../lib/collageTemplates';
 import { useUndoableState } from './useUndoableState';
 import FocalPointPicker from './FocalPointPicker';
+import MediaLibraryPicker from './MediaLibraryPicker';
 
 const CANVAS_PX = 860;
 const MOBILE_PREVIEW_PX = 375;
 const POSITIONAL_KEYS = ['left', 'top', 'width', 'height'];
+// Input types where a native text-undo could meaningfully conflict with
+// Cmd/Ctrl+Z — everything else (checkbox, radio, range, color, file…)
+// doesn't have a native undo worth protecting, so the shortcut should
+// still fire even while one of those happens to hold focus.
+const TEXT_INPUT_TYPES = new Set(['text', 'number', 'email', 'url', 'search', 'tel', 'password', undefined, '']);
 
 function genId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -109,15 +115,20 @@ export default function CollageEditor({
   collageRef.current = data;
 
   // Cmd/Ctrl+Z / Shift+Z — guarded so it never fires while the user is
-  // typing somewhere (a caption, a link field) and never fires from a
-  // different, currently-hidden Studio tab (Desktop/Mobile/Pages all
-  // stay mounted at once; only `offsetParent` tells visible from hidden).
+  // actually typing text somewhere (a caption, a link field) and never
+  // fires from a different, currently-hidden Studio tab (Desktop/Mobile/
+  // Pages all stay mounted at once; only `offsetParent` tells visible
+  // from hidden). Only TEXT-editing inputs count here — a checkbox
+  // keeps focus after you click it (border/mat/lock/lightbox toggles
+  // all do this), and excluding every `<input>` regardless of type
+  // silently ate the shortcut right after any of those clicks.
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const active = document.activeElement as HTMLElement | null;
       const tag = active?.tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || active?.isContentEditable) return;
+      const isTextInput = tag === 'input' && TEXT_INPUT_TYPES.has((active as HTMLInputElement).type);
+      if (isTextInput || tag === 'textarea' || tag === 'select' || active?.isContentEditable) return;
       if (!rootRef.current || rootRef.current.offsetParent === null) return;
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
       e.preventDefault();
@@ -404,6 +415,10 @@ export default function CollageEditor({
     URL.revokeObjectURL(previewUrl);
   }
 
+  function addImageFromLibrary(sectionIndex: number, src: string, aspect: string | undefined) {
+    addTile(sectionIndex, { kind: 'image', id: genId(), src, aspect, left: 35, top: 35, width: 25, height: 20 } as CollageTile);
+  }
+
   async function handleUploadVideo(sectionIndex: number, file: File) {
     const previewUrl = URL.createObjectURL(file);
     const id = genId();
@@ -537,11 +552,12 @@ export default function CollageEditor({
             Thickness (px)
             <input
               type="number"
-              min={1}
+              min={0.5}
               max={10}
+              step={0.5}
               style={{ width: '4rem', padding: '0.2rem 0.3rem', border: '1px solid #ccc', borderRadius: 4 }}
               value={tile.borderWidth ?? 2}
-              onChange={(e) => patchTile(selected!.section, tile.id, { borderWidth: parseInt(e.target.value, 10) || 2 } as Partial<CollageTile>)}
+              onChange={(e) => patchTile(selected!.section, tile.id, { borderWidth: parseFloat(e.target.value) || 2 } as Partial<CollageTile>)}
             />
           </label>
         )}
@@ -720,6 +736,7 @@ export default function CollageEditor({
                     }}
                   />
                 </label>
+                <MediaLibraryPicker onSelect={(src, aspect) => addImageFromLibrary(si, src, aspect)} />
                 <label className="studio__btn">
                   + Video
                   <input
@@ -984,9 +1001,16 @@ export default function CollageEditor({
               </div>
 
               {!previewMode && (
-              <div style={{ marginTop: '0.75rem' }}>
+              <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
                 <button className="studio__btn" onClick={() => resizeSectionHeight(si, section.canvasHeight + 300)}>
                   Make longer
+                </button>
+                <button
+                  className="studio__btn"
+                  disabled={section.canvasHeight <= 200}
+                  onClick={() => resizeSectionHeight(si, section.canvasHeight - 300)}
+                >
+                  Make shorter
                 </button>
               </div>
               )}
@@ -1022,6 +1046,10 @@ export default function CollageEditor({
                   if (file) handleReplaceImage(selected!.section, selectedTile.id, file);
                   e.currentTarget.value = '';
                 }}
+              />
+              <MediaLibraryPicker
+                label="…or replace from Library"
+                onSelect={(src, aspect) => patchTile(selected!.section, selectedTile.id, { src, aspect } as Partial<CollageTile>)}
               />
             </div>
             {lightboxControl(selectedTile)}

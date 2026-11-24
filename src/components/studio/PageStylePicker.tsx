@@ -65,11 +65,30 @@ const DIAGRAMS: Record<PageStyle, () => JSX.Element> = {
   'object-study': ObjectStudyDiagram,
 };
 
+const NONE_DESCRIPTION = 'The default look — no extra spacing or typography treatment. This is what every page used before page styles existed.';
+
 const PAGE_STYLE_OPTIONS: { value: PageStyle; label: string; description: string }[] = [
-  { value: 'single-image', label: 'Single Image', description: 'One photo is the star, with an optional detail shot and note.' },
-  { value: 'photo-essay', label: 'Photo Essay', description: 'Large photos with generous space, light on text.' },
-  { value: 'editorial', label: 'Editorial Article', description: 'A bolder headline and denser body text.' },
-  { value: 'object-study', label: 'Object Study', description: 'A photo with a quiet, serif annotation beneath it.' },
+  {
+    value: 'single-image',
+    label: 'Single Image',
+    description:
+      'For a page that\'s really just one photograph. Also reveals two extra optional fields below: a second "detail" photo, and a short note.',
+  },
+  {
+    value: 'photo-essay',
+    label: 'Photo Essay',
+    description: 'More breathing room between photos and a quieter title — good when the writing is light and the photos should carry the page.',
+  },
+  {
+    value: 'editorial',
+    label: 'Editorial Article',
+    description: 'A bigger, bolder title — good for a page with real writing in the body.',
+  },
+  {
+    value: 'object-study',
+    label: 'Object Study',
+    description: 'The caption renders in a quiet serif, like a handwritten museum label — good for a single object, scan, or curiosity.',
+  },
 ];
 
 interface Props {
@@ -78,35 +97,43 @@ interface Props {
 }
 
 export default function PageStylePicker({ value, onChange }: Props) {
+  const selectedDescription = value ? PAGE_STYLE_OPTIONS.find((opt) => opt.value === value)?.description : NONE_DESCRIPTION;
+
   return (
-    <div className="studio__pagestyle-grid">
-      <button
-        type="button"
-        className={`studio__pagestyle-card${!value ? ' studio__pagestyle-card--active' : ''}`}
-        onClick={() => onChange(undefined)}
-      >
-        <div className="studio__pagestyle-diagram studio__pagestyle-diagram--none">
-          <span>—</span>
-        </div>
-        <strong>None</strong>
-      </button>
-      {PAGE_STYLE_OPTIONS.map((opt) => {
-        const Diagram = DIAGRAMS[opt.value];
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            title={opt.description}
-            className={`studio__pagestyle-card${value === opt.value ? ' studio__pagestyle-card--active' : ''}`}
-            onClick={() => onChange(opt.value)}
-          >
-            <div className="studio__pagestyle-diagram">
-              <Diagram />
-            </div>
-            <strong>{opt.label}</strong>
-          </button>
-        );
-      })}
+    <div>
+      <p className="studio__pagestyle-hint">
+        Purely visual — it changes spacing and typography once you fill in the title, image, and body fields below like
+        normal. It never changes which template (Standard/Collage/Contact Sheet) you're using.
+      </p>
+      <div className="studio__pagestyle-grid">
+        <button
+          type="button"
+          className={`studio__pagestyle-card${!value ? ' studio__pagestyle-card--active' : ''}`}
+          onClick={() => onChange(undefined)}
+        >
+          <div className="studio__pagestyle-diagram studio__pagestyle-diagram--none">
+            <span>—</span>
+          </div>
+          <strong>None</strong>
+        </button>
+        {PAGE_STYLE_OPTIONS.map((opt) => {
+          const Diagram = DIAGRAMS[opt.value];
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              className={`studio__pagestyle-card${value === opt.value ? ' studio__pagestyle-card--active' : ''}`}
+              onClick={() => onChange(opt.value)}
+            >
+              <div className="studio__pagestyle-diagram">
+                <Diagram />
+              </div>
+              <strong>{opt.label}</strong>
+            </button>
+          );
+        })}
+      </div>
+      {selectedDescription && <p className="studio__pagestyle-description">{selectedDescription}</p>}
     </div>
   );
 }
