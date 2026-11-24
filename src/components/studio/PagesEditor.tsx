@@ -215,7 +215,12 @@ export default function PagesEditor() {
       method: 'POST',
       body: JSON.stringify({ type: newType, title: newTitle || undefined, pageStyle: newPageStyle || undefined }),
     });
-    const { slug } = await res.json();
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error ?? 'Failed to create the page.');
+      return;
+    }
+    const { slug } = body;
     rememberOpenSlug(slug);
     refreshList();
     setCreating(false);
@@ -448,28 +453,6 @@ export default function PagesEditor() {
               <a href={`http://localhost:4321/entries/${originalSlug}`} target="_blank" rel="noopener noreferrer" className="studio__btn">
                 Preview ↗
               </a>
-              <button
-                className={`studio__btn${previewMode ? ' studio__btn--primary' : ''}`}
-                onClick={() => setPreviewMode((v) => !v)}
-              >
-                {previewMode ? 'Exit preview' : 'Preview'}
-              </button>
-              {previewMode && (
-                <>
-                  <button
-                    className={`studio__btn${previewWidth === 'desktop' ? ' studio__btn--primary' : ''}`}
-                    onClick={() => setPreviewWidth('desktop')}
-                  >
-                    Desktop
-                  </button>
-                  <button
-                    className={`studio__btn${previewWidth === 'mobile' ? ' studio__btn--primary' : ''}`}
-                    onClick={() => setPreviewWidth('mobile')}
-                  >
-                    Mobile
-                  </button>
-                </>
-              )}
               <label className="studio__lock-toggle" title="Keeps this page off the nav's random 'elsewhere' link — still reachable at its own URL.">
                 <input type="checkbox" checked={current.hidden ?? false} onChange={(e) => patch({ hidden: e.target.checked || undefined })} />
                 Hidden (skip in &ldquo;elsewhere&rdquo;)
@@ -519,6 +502,31 @@ export default function PagesEditor() {
                 <FieldForm page={current} onChange={patch} />
               </div>
             )}
+
+            <div className="studio__section-header" style={{ margin: 0, marginTop: '1.5rem', marginBottom: '0.5rem' }}>
+              <button
+                className={`studio__btn${previewMode ? ' studio__btn--primary' : ''}`}
+                onClick={() => setPreviewMode((v) => !v)}
+              >
+                {previewMode ? 'Exit preview' : 'Preview'}
+              </button>
+              {previewMode && (
+                <>
+                  <button
+                    className={`studio__btn${previewWidth === 'desktop' ? ' studio__btn--primary' : ''}`}
+                    onClick={() => setPreviewWidth('desktop')}
+                  >
+                    Desktop
+                  </button>
+                  <button
+                    className={`studio__btn${previewWidth === 'mobile' ? ' studio__btn--primary' : ''}`}
+                    onClick={() => setPreviewWidth('mobile')}
+                  >
+                    Mobile
+                  </button>
+                </>
+              )}
+            </div>
 
             {current.template === 'collage' ? (
               <>
@@ -687,10 +695,12 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
           <option value="contact-sheet">Contact Sheet</option>
         </select>
       </div>
-      <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
-        <label>Page style (optional)</label>
-        <PageStylePicker value={page.pageStyle} onChange={(v) => onChange({ pageStyle: v })} />
-      </div>
+      {(page.template ?? 'standard') === 'standard' && (
+        <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
+          <label>Page style (optional)</label>
+          <PageStylePicker value={page.pageStyle} onChange={(v) => onChange({ pageStyle: v })} />
+        </div>
+      )}
       <div className="studio__field">
         <label>Date</label>
         <input type="date" value={page.date} onChange={(e) => onChange({ date: e.target.value })} />

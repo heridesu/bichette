@@ -68,6 +68,13 @@ export default function CollageEditor({
   const [confirmingRemoveSection, setConfirmingRemoveSection] = useState<number | null>(null);
   const [showCheckerboard, setShowCheckerboard] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
+  const [showSafeArea, setShowSafeArea] = useState(false);
+
+  // A Standard page's own body column (.entry-page, entries/[slug].astro)
+  // is 48rem/768px wide — the same width the Contact Sheet's "Normal"
+  // desktop-width option uses. This is purely a Studio reference guide,
+  // never written to saved data or rendered on the public site.
+  const STANDARD_WIDTH_PX = 768;
 
   // The collage is a controlled prop AND has its own in-session undo
   // history — this reconciles the two. `undoable.value` is what actually
@@ -536,6 +543,22 @@ export default function CollageEditor({
     </div>
   );
 
+  // Image-only, and redundant once fully Locked (which already keeps
+  // the size too) — Shuffle Layout can still move this tile to whichever
+  // new slot fits best, it just won't resize it to that slot's own size.
+  const lockSizeControl = selected?.kind === 'tile' && selectedTile?.kind === 'image' && !selectedLocked && (
+    <div className="studio__field">
+      <label className="studio__lock-toggle">
+        <input
+          type="checkbox"
+          checked={selectedTile.lockSize ?? false}
+          onChange={(e) => patchTile(selected.section, selectedTile.id, { lockSize: e.target.checked || undefined } as Partial<CollageTile>)}
+        />
+        Lock size — Shuffle Layout can move it, but won't resize it
+      </label>
+    </div>
+  );
+
   function framingControls(tile: CollageTile) {
     return (
       <>
@@ -669,6 +692,13 @@ export default function CollageEditor({
             <label className="studio__checkerboard-toggle">
               <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} />
               Snap alignment
+            </label>
+            <label
+              className="studio__checkerboard-toggle"
+              title="Marks where a Standard page's own (narrower) content column would end — just a reference, not an enforced boundary."
+            >
+              <input type="checkbox" checked={showSafeArea} onChange={(e) => setShowSafeArea(e.target.checked)} />
+              Standard-width guide
             </label>
           </div>
         )}
@@ -831,6 +861,13 @@ export default function CollageEditor({
                   className={`deco-canvas${showCheckerboard ? ' deco-canvas--checkerboard' : ''}`}
                   style={{ width: CANVAS_PX, height: heightPx, transform: previewScale !== 1 ? `scale(${previewScale})` : undefined, transformOrigin: 'top left' }}
                 >
+                {!previewMode &&
+                  showSafeArea &&
+                  (() => {
+                    const guideWidth = CANVAS_PX * Math.min(1, STANDARD_WIDTH_PX / section.canvasWidth);
+                    const guideLeft = (CANVAS_PX - guideWidth) / 2;
+                    return <div className="studio__safe-area-guide" style={{ left: guideLeft, width: guideWidth, height: heightPx }} />;
+                  })()}
                 {section.tiles.map((tile) => {
                   const x = (tile.left / 100) * CANVAS_PX;
                   const y = (tile.top / 100) * heightPx;
@@ -897,6 +934,11 @@ export default function CollageEditor({
                           </div>
                         )}
                         {tile.locked && !previewMode && <span className="studio__lock-badge" title="Locked">🔒</span>}
+                        {!tile.locked && tile.lockSize && !previewMode && (
+                          <span className="studio__lock-badge" title="Size locked — Shuffle Layout won't resize this">
+                            📐
+                          </span>
+                        )}
                       </div>
                     </Rnd>
                   );
@@ -1064,6 +1106,7 @@ export default function CollageEditor({
             {framingControls(selectedTile)}
             {alignControls}
             {lockControl}
+            {lockSizeControl}
             {stackControls}
             <button className="studio__btn studio__btn--danger" onClick={removeSelected}>
               Remove from page
@@ -1097,6 +1140,7 @@ export default function CollageEditor({
             {framingControls(selectedTile)}
             {alignControls}
             {lockControl}
+            {lockSizeControl}
             {stackControls}
             <button className="studio__btn studio__btn--danger" onClick={removeSelected}>
               Remove from page
@@ -1117,6 +1161,7 @@ export default function CollageEditor({
             </div>
             {alignControls}
             {lockControl}
+            {lockSizeControl}
             {stackControls}
             <button className="studio__btn studio__btn--danger" onClick={removeSelected}>
               Remove from page
@@ -1168,6 +1213,7 @@ export default function CollageEditor({
             </div>
             {alignControls}
             {lockControl}
+            {lockSizeControl}
             {stackControls}
             <button className="studio__btn studio__btn--danger" onClick={removeSelected}>
               Remove from page
@@ -1222,6 +1268,7 @@ export default function CollageEditor({
               </button>
             )}
             {lockControl}
+            {lockSizeControl}
             {stackControls}
             <button className="studio__btn studio__btn--danger" style={{ marginTop: '0.75rem' }} onClick={removeSelected}>
               Remove
@@ -1233,6 +1280,7 @@ export default function CollageEditor({
           <>
             <h3>Thumbtack</h3>
             {lockControl}
+            {lockSizeControl}
             {stackControls}
             <button className="studio__btn studio__btn--danger" onClick={removeSelected}>
               Remove

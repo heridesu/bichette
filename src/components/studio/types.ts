@@ -64,6 +64,12 @@ interface CollageItemBase {
    * (keeps its position/size); also resists manual drag/resize in Studio.
    * Never read by the public site — it's an authoring-only concept. */
   locked?: boolean;
+  /** Keeps this image's own on-screen size (in px) when Shuffle Layout
+   * reflows the page into a different template variant — its position
+   * can still move to whichever new slot fits best, only the size stays
+   * put. Meaningless (and ignored) once `locked` is also set, since that
+   * already freezes position AND size. Never read by the public site. */
+  lockSize?: boolean;
 }
 
 export interface CollageImageItem extends CollageItemBase {
@@ -193,6 +199,11 @@ export interface ContactSheetData {
   showCaptions?: boolean;
   /** Film style only. Omitted = false. */
   showFrameNumbers?: boolean;
+  /** Desktop column width. Omitted/'full' = the standard wide content
+   * column (1400px); 'normal' narrows it to the same width as a Standard
+   * article body (48rem). Mobile is unaffected either way — its own
+   * viewport is already narrower than both. */
+  widthDesktop?: 'full' | 'normal';
 }
 
 export interface EntryInfo {

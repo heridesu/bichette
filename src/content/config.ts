@@ -32,6 +32,9 @@ const collageItemBase = {
   // Excluded from Shuffle Images/Layout and manual drag/resize in
   // Studio — an authoring-only concept, never read by the public site.
   locked: z.boolean().optional(),
+  // Keeps this image's own size through Shuffle Layout while still
+  // letting it move to a new slot — ignored once `locked` is also set.
+  lockSize: z.boolean().optional(),
 };
 
 const collageTile = z.discriminatedUnion('kind', [
@@ -145,6 +148,7 @@ const contactSheetData = z.object({
   aspect: z.enum(['original', 'square', 'portrait', 'landscape']).optional(),
   showCaptions: z.boolean().optional(),
   showFrameNumbers: z.boolean().optional(),
+  widthDesktop: z.enum(['full', 'normal']).optional(),
 });
 
 // A single "entries" collection holds every kind of thing that goes on the

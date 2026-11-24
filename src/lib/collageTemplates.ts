@@ -90,15 +90,15 @@ const wanderingGalleryA: TemplateVariant = {
   canvasHeight: 1600,
   slots: [
     { left: 8, top: 8, width: 28, height: 32, weight: 'anchor' },
-    { left: 30, top: 32, width: 12, height: 10, weight: 'small' }, // overlaps anchor's lower-right corner
+    { left: 28.8, top: 31, width: 14.4, height: 12, weight: 'small' }, // overlaps anchor's lower-right corner
     { left: 58, top: 5, width: 22, height: 20, weight: 'medium' },
-    { left: 82, top: 8, width: 12, height: 11, weight: 'small' },
-    { left: 44, top: 12, width: 8, height: 7, weight: 'tiny' },
-    { left: 60, top: 29, width: 9, height: 8, weight: 'tiny' },
+    { left: 80.8, top: 6.9, width: 14.4, height: 13.2, weight: 'small' },
+    { left: 42.2, top: 10.4, width: 11.6, height: 10.2, weight: 'tiny' },
+    { left: 58, top: 27.2, width: 13, height: 11.6, weight: 'tiny' },
     { left: 68, top: 45, width: 26, height: 30, weight: 'medium' },
-    { left: 60, top: 40, width: 11, height: 9, weight: 'small' }, // overlaps the second focal point's corner
+    { left: 58.9, top: 39.1, width: 13.2, height: 10.8, weight: 'small' }, // overlaps the second focal point's corner
     { left: 10, top: 50, width: 20, height: 24, weight: 'medium' },
-    { left: 12, top: 80, width: 14, height: 12, weight: 'small' },
+    { left: 10.6, top: 78.8, width: 16.8, height: 14.4, weight: 'small' },
     { left: 38, top: 76, width: 28, height: 16, weight: 'medium' },
   ],
 };
@@ -117,7 +117,7 @@ const editorialEntryA: TemplateVariant = {
     { left: 6, top: 78, width: 48, height: 8, weight: 'small', kind: 'text' },
     { left: 58, top: 6, width: 36, height: 26, weight: 'medium' },
     { left: 58, top: 34, width: 36, height: 16, weight: 'small', kind: 'text' },
-    { left: 58, top: 52, width: 36, height: 20, weight: 'small' },
+    { left: 55.3, top: 50.5, width: 41.4, height: 23, weight: 'small' },
     { left: 58, top: 74, width: 36, height: 12, weight: 'small', kind: 'text' },
   ],
 };
@@ -134,20 +134,20 @@ const cabinetOfCuriositiesA: TemplateVariant = {
   slots: [
     // Cluster A — anchor + two small pieces, upper-left
     { left: 6, top: 6, width: 24, height: 24, weight: 'anchor' },
-    { left: 30, top: 8, width: 11, height: 9, weight: 'small' },
-    { left: 6, top: 32, width: 9, height: 7, weight: 'tiny' },
-    { left: 16, top: 32, width: 12, height: 10, weight: 'small' },
+    { left: 29.4, top: 7.5, width: 12.1, height: 9.9, weight: 'small' },
+    { left: 4.8, top: 31.1, width: 11.3, height: 8.8, weight: 'tiny' },
+    { left: 15.4, top: 31.5, width: 13.2, height: 11, weight: 'small' },
     // Cluster B — a standalone small group, upper-right
     { left: 58, top: 6, width: 20, height: 18, weight: 'medium' },
-    { left: 80, top: 8, width: 8, height: 6, weight: 'tiny' },
-    { left: 80, top: 16, width: 10, height: 11, weight: 'small' },
+    { left: 79, top: 7.3, width: 10, height: 7.5, weight: 'tiny' },
+    { left: 79.5, top: 15.4, width: 11, height: 12.1, weight: 'small' },
     // Cluster C — second anchor + its own small pieces, lower-center-right
     { left: 42, top: 46, width: 24, height: 24, weight: 'anchor' },
-    { left: 68, top: 48, width: 12, height: 10, weight: 'small' },
-    { left: 42, top: 72, width: 8, height: 6, weight: 'tiny' },
+    { left: 67.4, top: 47.5, width: 13.2, height: 11, weight: 'small' },
+    { left: 41, top: 71.3, width: 10, height: 7.5, weight: 'tiny' },
     // Cluster D — loose scatter, lower-left
-    { left: 6, top: 46, width: 13, height: 12, weight: 'small' },
-    { left: 6, top: 60, width: 9, height: 7, weight: 'tiny' },
+    { left: 5.3, top: 45.4, width: 14.3, height: 13.2, weight: 'small' },
+    { left: 4.8, top: 59.1, width: 11.3, height: 8.8, weight: 'tiny' },
     // Closing piece, offset rather than a full-width bar
     { left: 20, top: 78, width: 45, height: 15, weight: 'banner' },
   ],
@@ -204,6 +204,10 @@ export interface TemplateImageInput {
   mat?: boolean;
   matPadding?: number;
   lightbox?: boolean;
+  /** Set only by Shuffle Layout, for a tile with `lockSize` — this
+   * image's current on-screen size (px), carried through so the matched
+   * slot still decides WHERE it lands but not how big it renders. */
+  lockedSizePx?: { width: number; height: number };
 }
 
 function parseAspect(aspect: string | undefined): number {
@@ -402,6 +406,17 @@ function tilesFromPairs(pairs: { slot: PositionedSlot; image: TemplateImageInput
     .filter((p) => p.slot.section === sectionIndex)
     .map(({ slot, image }, i) => {
       const adapted = adaptSlotToImage(slot.slot, parseAspect(image.aspect), slot.canvasWidth, slot.canvasHeight);
+      // A locked-size image keeps its own pixel dimensions — centered on
+      // the matched slot's own center — instead of the slot's computed box.
+      const sized = image.lockedSizePx
+        ? (() => {
+            const width = (image.lockedSizePx!.width / slot.canvasWidth) * 100;
+            const height = (image.lockedSizePx!.height / slot.canvasHeight) * 100;
+            const centerLeft = adapted.left + adapted.width / 2;
+            const centerTop = adapted.top + adapted.height / 2;
+            return { left: centerLeft - width / 2, top: centerTop - height / 2, width, height };
+          })()
+        : adapted;
       return {
         kind: 'image',
         id: genId(),
@@ -413,10 +428,11 @@ function tilesFromPairs(pairs: { slot: PositionedSlot; image: TemplateImageInput
         mat: image.mat,
         matPadding: image.matPadding,
         lightbox: image.lightbox,
-        left: adapted.left,
-        top: adapted.top,
-        width: adapted.width,
-        height: adapted.height,
+        lockSize: image.lockedSizePx ? true : undefined,
+        left: sized.left,
+        top: sized.top,
+        width: sized.width,
+        height: sized.height,
         z: i + 1,
       } satisfies CollageTile;
     });
@@ -644,13 +660,13 @@ function shuffleLayoutSections(sections: CollageSection[], template: CollageTemp
   type CarriedTack = { kind: 'tack'; piece: TackPiece; fromW: number; fromH: number };
   const carried: (CarriedTile | CarriedTape | CarriedTack)[] = [];
 
-  const unlockedImages: CollageTile[] = [];
+  const unlockedImages: { tile: CollageTile; fromW: number; fromH: number }[] = [];
   const unlockedTexts: { tile: CollageTile; fromW: number; fromH: number }[] = [];
 
   for (const section of sections) {
     for (const tile of section.tiles) {
       if (tile.kind === 'image' && !tile.locked) {
-        unlockedImages.push(tile);
+        unlockedImages.push({ tile, fromW: section.canvasWidth, fromH: section.canvasHeight });
       } else if (tile.kind === 'text' && !tile.locked) {
         unlockedTexts.push({ tile, fromW: section.canvasWidth, fromH: section.canvasHeight });
       } else {
@@ -663,7 +679,7 @@ function shuffleLayoutSections(sections: CollageSection[], template: CollageTemp
     for (const piece of section.tacks) carried.push({ kind: 'tack', piece, fromW: section.canvasWidth, fromH: section.canvasHeight });
   }
 
-  const images: TemplateImageInput[] = unlockedImages.map((tile) => {
+  const images: TemplateImageInput[] = unlockedImages.map(({ tile, fromW, fromH }) => {
     const img = tile as CollageTile & { kind: 'image' };
     return {
       src: img.src,
@@ -674,6 +690,7 @@ function shuffleLayoutSections(sections: CollageSection[], template: CollageTemp
       mat: img.mat,
       matPadding: img.matPadding,
       lightbox: img.lightbox,
+      lockedSizePx: img.lockSize ? { width: (img.width / 100) * fromW, height: (img.height / 100) * fromH } : undefined,
     };
   });
 

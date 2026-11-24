@@ -39,7 +39,7 @@ const aspectRatio = ASPECT_RATIO[aspect];
   style={`--cols-desktop:${columnsDesktop};--cols-mobile:${columnsMobile};--gap-x:${gapX}px;--gap-y:${gapY}px;`}
 >
   {data.images.map((image, i) => (
-    <figure class="contact-sheet__cell">
+    <figure class={`contact-sheet__cell${data.style === 'film' ? ' contact-sheet__cell--film' : ''}`}>
       <div
         class="contact-sheet__frame"
         style={aspectRatio ? `aspect-ratio:${aspectRatio};` : ''}
@@ -59,10 +59,8 @@ const aspectRatio = ASPECT_RATIO[aspect];
           style={`object-position:${image.focalX ?? 50}% ${image.focalY ?? 50}%;`}
         />
       </div>
+      {data.style === 'film' && data.showFrameNumbers && <span class="contact-sheet__framenum">{i + 1}</span>}
       {data.showCaptions && image.caption && <figcaption class="contact-sheet__caption">{image.caption}</figcaption>}
-      {data.style === 'film' && data.showFrameNumbers && (
-        <p class="contact-sheet__framenum">{String(i + 1).padStart(2, '0')}</p>
-      )}
     </figure>
   ))}
 </div>
@@ -132,12 +130,30 @@ const aspectRatio = ASPECT_RATIO[aspect];
     color: #999;
   }
 
+  /* Frame numbers print along the right edge of each frame, rotated
+     like a lab stamp on a real contact sheet — not centered underneath. */
+  .contact-sheet__cell--film {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .contact-sheet__cell--film .contact-sheet__frame {
+    flex: 1;
+    min-width: 0;
+  }
+
   .contact-sheet__framenum {
-    margin: 0.3rem 0 0;
+    flex-shrink: 0;
+    width: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
     font-family: var(--font-mono);
     font-size: 0.6rem;
-    letter-spacing: 0.04em;
-    text-align: center;
-    color: #777;
+    letter-spacing: 0.08em;
+    color: #888;
   }
 </style>

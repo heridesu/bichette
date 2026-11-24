@@ -619,6 +619,16 @@
   background: repeating-conic-gradient(#eee 0% 25%, #f6f6f4 0% 50%) 50% / 20px 20px;
 }
 
+/* Studio-only reference guide — never rendered on the public site. */
+.studio__safe-area-guide {
+  position: absolute;
+  top: 0;
+  border-left: 1px dashed rgba(36, 86, 214, 0.45);
+  border-right: 1px dashed rgba(36, 86, 214, 0.45);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .deco-tile {
   position: absolute;
   overflow: hidden;
@@ -963,6 +973,7 @@
 }
 
 .contact-sheet__frame {
+  position: relative;
   display: block;
   overflow: hidden;
   cursor: pointer;
@@ -989,6 +1000,31 @@
 
 .contact-sheet--film .contact-sheet__frame {
   border: 1px solid #3a3a3a;
+}
+
+.contact-sheet__cell--film {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.contact-sheet__cell--film .contact-sheet__frame {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-sheet__framenum {
+  flex-shrink: 0;
+  width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: #888;
 }
 
 .contact-sheet__caption {

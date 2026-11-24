@@ -128,6 +128,13 @@ export default function ContactSheetEditor({ data, onChange, onUpload, previewMo
               onChange={(e) => patch({ columnsMobile: parseInt(e.target.value, 10) || 2 })}
             />
           </label>
+          <label className="studio__section-height" title="Mobile is unaffected either way — it's already narrower than both.">
+            Desktop width
+            <select value={data.widthDesktop ?? 'full'} onChange={(e) => patch({ widthDesktop: e.target.value as 'full' | 'normal' })}>
+              <option value="full">Full (wide column)</option>
+              <option value="normal">Normal (article width)</option>
+            </select>
+          </label>
         </div>
         <div className="studio__collage-toolbar">
           <label className="studio__section-height">
@@ -197,12 +204,18 @@ export default function ContactSheetEditor({ data, onChange, onUpload, previewMo
         <div
           className={`contact-sheet contact-sheet--${data.style}`}
           data-aspect={aspect}
-          style={{ ['--cols-desktop' as any]: columnsDesktop, ['--cols-mobile' as any]: columnsMobile, ['--gap-x' as any]: `${gapX}px`, ['--gap-y' as any]: `${gapY}px` }}
+          style={{
+            ['--cols-desktop' as any]: columnsDesktop,
+            ['--cols-mobile' as any]: columnsMobile,
+            ['--gap-x' as any]: `${gapX}px`,
+            ['--gap-y' as any]: `${gapY}px`,
+            maxWidth: data.widthDesktop === 'normal' ? '48rem' : undefined,
+          }}
         >
           {data.images.map((img, i) => (
             <figure
               key={img.id}
-              className={`contact-sheet__cell studio__contact-sheet-cell${!previewMode && selectedId === img.id ? ' studio__contact-sheet-cell--selected' : ''}${draggingId === img.id ? ' studio__contact-sheet-cell--dragging' : ''}`}
+              className={`contact-sheet__cell${data.style === 'film' ? ' contact-sheet__cell--film' : ''} studio__contact-sheet-cell${!previewMode && selectedId === img.id ? ' studio__contact-sheet-cell--selected' : ''}${draggingId === img.id ? ' studio__contact-sheet-cell--dragging' : ''}`}
               draggable={!previewMode}
               onDragStart={() => setDraggingId(img.id)}
               onDragEnd={() => setDraggingId(null)}
@@ -218,14 +231,21 @@ export default function ContactSheetEditor({ data, onChange, onUpload, previewMo
                 onClick={() => !previewMode && setSelectedId(img.id)}
               >
                 <img src={midSrc(img.src)} alt="" draggable={false} style={{ objectPosition: `${img.focalX ?? 50}% ${img.focalY ?? 50}%` }} />
+                {!previewMode && (
+                  <button
+                    className="studio__contact-sheet-remove"
+                    title="Remove from this sheet"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(img.id);
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
-              {!previewMode && (
-                <button className="studio__contact-sheet-remove" title="Remove from this sheet" onClick={() => removeImage(img.id)}>
-                  ✕
-                </button>
-              )}
+              {data.style === 'film' && data.showFrameNumbers && <span className="contact-sheet__framenum">{i + 1}</span>}
               {data.showCaptions && img.caption && <figcaption className="contact-sheet__caption">{img.caption}</figcaption>}
-              {data.style === 'film' && data.showFrameNumbers && <p className="contact-sheet__framenum">{String(i + 1).padStart(2, '0')}</p>}
             </figure>
           ))}
         </div>

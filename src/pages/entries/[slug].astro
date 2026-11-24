@@ -146,7 +146,7 @@ function tileWrapper(tile: { href?: string; kind: string; lightbox?: boolean; sr
       ))}
     </div>
   ) : contactSheet ? (
-    <div class="wrap contact-sheet-page">
+    <div class={`wrap contact-sheet-page${contactSheet.widthDesktop === 'normal' ? ' contact-sheet-page--normal' : ''}`}>
       {title && <h1 class="contact-sheet-page__title">{title}</h1>}
       <ContactSheet data={contactSheet} groupId={entry.slug} />
     </div>
@@ -433,6 +433,13 @@ function tileWrapper(tile: { href?: string; kind: string; lightbox?: boolean; sr
     max-width: var(--max-width);
     padding-top: 2.5rem;
     padding-bottom: 5rem;
+  }
+
+  /* Narrows the desktop column to match a Standard article's body width
+     instead of the full wide column. Mobile is unaffected either way —
+     its own viewport is already narrower than 48rem. */
+  .contact-sheet-page--normal {
+    max-width: 48rem;
   }
 
   .contact-sheet-page__title {
