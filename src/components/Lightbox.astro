@@ -2,23 +2,52 @@
 // One shared full-screen image viewer, included once (in BaseLayout).
 // Anything on the page can trigger it by being a [data-lightbox-src]
 // element — used by homepage tiles whose "links to" is set to
-// "Full image" rather than a real navigation.
+// "Full image" rather than a real navigation, by collage/Figure images
+// with `lightbox` set, and by Contact Sheet cells. An element can
+// additionally carry [data-lightbox-group="<id>"] (e.g. a contact
+// sheet's own slug) to opt into prev/next navigation among every other
+// element sharing that same group, in DOM order — an element with no
+// group behaves exactly as before: single image, no arrows.
 ---
 
 <div class="lightbox" id="lightbox" aria-hidden="true">
   <button class="lightbox__close" id="lightbox-close" aria-label="Close">✕</button>
+  <button class="lightbox__nav lightbox__nav--prev" id="lightbox-prev" aria-label="Previous image">‹</button>
   <img class="lightbox__img" id="lightbox-img" alt="" />
+  <button class="lightbox__nav lightbox__nav--next" id="lightbox-next" aria-label="Next image">›</button>
 </div>
 
 <script>
   const overlay = document.getElementById('lightbox');
   const img = document.getElementById('lightbox-img') as HTMLImageElement | null;
   const closeBtn = document.getElementById('lightbox-close');
+  const prevBtn = document.getElementById('lightbox-prev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('lightbox-next') as HTMLButtonElement | null;
 
-  function open(src: string, alt: string) {
+  // The currently open gallery (empty/single for a plain, ungrouped
+  // trigger) and which one of it is showing.
+  let group: Element[] = [];
+  let index = 0;
+
+  function showAt(i: number) {
+    if (!img || group.length === 0) return;
+    index = ((i % group.length) + group.length) % group.length;
+    const el = group[index];
+    img.src = el.getAttribute('data-lightbox-src') ?? '';
+    img.alt = el.getAttribute('data-lightbox-alt') ?? '';
+  }
+
+  function open(el: Element) {
     if (!img || !overlay) return;
-    img.src = src;
-    img.alt = alt;
+    const groupId = el.getAttribute('data-lightbox-group');
+    group = groupId
+      ? Array.from(document.querySelectorAll(`[data-lightbox-group="${CSS.escape(groupId)}"]`))
+      : [el];
+    index = Math.max(0, group.indexOf(el));
+    showAt(index);
+    const showNav = group.length > 1;
+    prevBtn?.classList.toggle('is-visible', showNav);
+    nextBtn?.classList.toggle('is-visible', showNav);
     overlay.classList.add('is-open');
     overlay.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -30,14 +59,11 @@
     overlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     img.src = '';
+    group = [];
   }
 
   document.querySelectorAll('[data-lightbox-src]').forEach((el) => {
-    const trigger = () => {
-      const src = el.getAttribute('data-lightbox-src');
-      const alt = el.getAttribute('data-lightbox-alt') ?? '';
-      if (src) open(src, alt);
-    };
+    const trigger = () => open(el);
     el.addEventListener('click', (e) => {
       e.preventDefault();
       trigger();
@@ -51,12 +77,24 @@
     });
   });
 
+  prevBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showAt(index - 1);
+  });
+  nextBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showAt(index + 1);
+  });
+
   overlay?.addEventListener('click', (e) => {
     if (e.target === overlay) close();
   });
   closeBtn?.addEventListener('click', close);
   document.addEventListener('keydown', (e) => {
+    if (!overlay?.classList.contains('is-open')) return;
     if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowLeft' && group.length > 1) showAt(index - 1);
+    else if (e.key === 'ArrowRight' && group.length > 1) showAt(index + 1);
   });
 </script>
 
@@ -99,5 +137,36 @@
 
   .lightbox__close:hover {
     opacity: 0.8;
+  }
+
+  .lightbox__nav {
+    display: none;
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 2.5rem;
+    line-height: 1;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  .lightbox__nav.is-visible {
+    display: block;
+  }
+
+  .lightbox__nav:hover {
+    opacity: 0.8;
+  }
+
+  .lightbox__nav--prev {
+    left: 0.5rem;
+  }
+
+  .lightbox__nav--next {
+    right: 0.5rem;
   }
 </style>

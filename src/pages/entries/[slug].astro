@@ -3,6 +3,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Figure from '../../components/Figure.astro';
 import FigureGrid from '../../components/FigureGrid.astro';
+import ContactSheet from '../../components/ContactSheet.astro';
 import { itemZ, tapeClipPath, tapeHeightPercent, youtubeEmbedId } from '../../lib/decorations';
 import { responsiveSrcSet } from '../../lib/images';
 
@@ -20,7 +21,8 @@ interface Props {
 
 const { entry } = Astro.props;
 const { Content } = await entry.render();
-const { title, image, imageAlt, aspect, caption, location, url, tags } = entry.data;
+const { title, image, imageAlt, aspect, caption, location, url, tags, pageStyle, detailImage, detailImageAlt, note } =
+  entry.data;
 
 // Two experiences sharing one template, not two separate page types:
 // an entry with no body text at all (most single-photo entries) gets a
@@ -36,16 +38,31 @@ const { title, image, imageAlt, aspect, caption, location, url, tags } = entry.d
 const hasBody = entry.body.trim().length > 0;
 const isMinimal = !hasBody;
 const collage = entry.data.template === 'collage' ? entry.data.collage : undefined;
+const contactSheet = entry.data.template === 'contact-sheet' ? entry.data.contactSheet : undefined;
 
-// A collage tile is only ever a link when its own `href` is set (unlike
-// the homepage, there's no per-tile link-type to choose from) — same
-// external-link handling as the homepage's own tileAttrs().
-function tileWrapper(href: string | undefined) {
-  if (!href) return { tag: 'div' as const, attrs: {} };
-  const external = href.startsWith('http');
+// A collage tile is either a lightbox trigger (its own image, opened
+// full-screen in place — same mechanism and script as the homepage's
+// "Full image" link type, see Lightbox.astro), a link (its own `href`
+// set), or neither — same external-link handling as the homepage's own
+// tileAttrs().
+function tileWrapper(tile: { href?: string; kind: string; lightbox?: boolean; src?: string; alt?: string }) {
+  if (tile.kind === 'image' && tile.lightbox) {
+    return {
+      tag: 'div' as const,
+      attrs: {
+        role: 'button',
+        tabindex: 0,
+        'data-lightbox-src': tile.src,
+        'data-lightbox-alt': tile.alt ?? '',
+        'aria-label': 'View image full size',
+      },
+    };
+  }
+  if (!tile.href) return { tag: 'div' as const, attrs: {} };
+  const external = tile.href.startsWith('http');
   return {
     tag: 'a' as const,
-    attrs: { href, target: external ? '_blank' : undefined, rel: external ? 'noopener noreferrer' : undefined },
+    attrs: { href: tile.href, target: external ? '_blank' : undefined, rel: external ? 'noopener noreferrer' : undefined },
   };
 }
 ---
@@ -56,20 +73,28 @@ function tileWrapper(href: string | undefined) {
       {title && <h1 class="collage-page__title">{title}</h1>}
       {collage.sections.map((section, i) => (
         <div
-          class="deco-canvas"
+          class={`deco-canvas${section.fullBleed ? ' deco-canvas--full-bleed' : ''}`}
           style={`aspect-ratio:${section.canvasWidth}/${section.canvasHeight};${i > 0 ? 'margin-top:3rem;' : ''}`}
         >
           {section.tiles.map((tile, ti) => {
-            const { tag: Tag, attrs } = tileWrapper(tile.href);
+            // A text tile a template placed but the user never wrote
+            // into — Studio shows a subtle "Add a caption…" hint for
+            // these, but the public site never ships an empty one as if
+            // it were real content.
+            if (tile.kind === 'text' && !tile.text.trim()) return null;
+            const { tag: Tag, attrs } = tileWrapper(tile);
+            const clickable = tile.href || (tile.kind === 'image' && tile.lightbox);
             // Only the very first tile of the first section gets eager
             // loading — a collage section can hold many overlapping
             // tiles, and marking all of them high-priority would defeat
             // the point of prioritizing anything.
             const eager = i === 0 && ti === 0;
+            const matPadding = tile.mat ? `padding:${tile.matPadding ?? 14}px;` : '';
+            const borderWidth = tile.border ? `border-width:${tile.borderWidth ?? 2}px;` : '';
             return (
               <Tag
-                class={`deco-tile${tile.href ? ' deco-tile--linked' : ''}${tile.border ? ' deco-tile--bordered' : ''}${tile.mat ? ' deco-tile--matted' : ''}`}
-                style={`left:${tile.left}%;top:${tile.top}%;width:${tile.width}%;height:${tile.height}%;z-index:${itemZ('tile', tile)};`}
+                class={`deco-tile${clickable ? ' deco-tile--linked' : ''}${tile.border ? ' deco-tile--bordered' : ''}${tile.mat ? ' deco-tile--matted' : ''}`}
+                style={`left:${tile.left}%;top:${tile.top}%;width:${tile.width}%;height:${tile.height}%;z-index:${itemZ('tile', tile)};${matPadding}${borderWidth}`}
                 {...(attrs as any)}
               >
                 {tile.kind === 'image' && (
@@ -80,6 +105,7 @@ function tileWrapper(href: string | undefined) {
                     alt={tile.alt ?? ''}
                     loading={eager ? 'eager' : 'lazy'}
                     fetchpriority={eager ? 'high' : undefined}
+                    style={`object-position: ${tile.focalX ?? 50}% ${tile.focalY ?? 50}%;`}
                   />
                 )}
                 {tile.kind === 'video' && <video src={tile.src} controls playsinline preload="metadata" />}
@@ -92,7 +118,13 @@ function tileWrapper(href: string | undefined) {
                     allowfullscreen
                   />
                 )}
-                {tile.kind === 'text' && <div class="deco-tile__text">{tile.text}</div>}
+                {tile.kind === 'text' && (
+                  <div
+                    class={`deco-tile__text${tile.textSize && tile.textSize !== 'body' ? ` deco-tile__text--${tile.textSize}` : ''}${tile.uppercase ? ' deco-tile__text--uppercase' : ''}`}
+                  >
+                    {tile.text}
+                  </div>
+                )}
               </Tag>
             );
           })}
@@ -113,8 +145,13 @@ function tileWrapper(href: string | undefined) {
         </div>
       ))}
     </div>
+  ) : contactSheet ? (
+    <div class="wrap contact-sheet-page">
+      {title && <h1 class="contact-sheet-page__title">{title}</h1>}
+      <ContactSheet data={contactSheet} groupId={entry.slug} />
+    </div>
   ) : isMinimal ? (
-    <article class="wrap entry-minimal">
+    <article class={`wrap entry-minimal${pageStyle ? ` entry-minimal--${pageStyle}` : ''}`}>
       {title && <p class="entry-minimal__title">{title}</p>}
 
       {image && (
@@ -131,6 +168,15 @@ function tileWrapper(href: string | undefined) {
       )}
 
       {caption && <p class="entry-minimal__caption">{caption}</p>}
+
+      {detailImage && (
+        <div class="entry-minimal__detail">
+          <img src={detailImage} srcset={responsiveSrcSet(detailImage)} sizes="40vw" alt={detailImageAlt ?? ''} loading="lazy" />
+        </div>
+      )}
+
+      {note && <p class="entry-minimal__note">{note}</p>}
+
       {location && <p class="entry-minimal__meta">{location}</p>}
 
       {url && (
@@ -146,7 +192,7 @@ function tileWrapper(href: string | undefined) {
       )}
     </article>
   ) : (
-    <article class="wrap entry-page">
+    <article class={`wrap entry-page${pageStyle ? ` entry-page--${pageStyle}` : ''}`}>
       {title && <h1 class="entry-page__title">{title}</h1>}
       {location && <p class="entry-page__location">{location}</p>}
 
@@ -220,6 +266,49 @@ function tileWrapper(href: string | undefined) {
     color: var(--ink-soft);
     font-style: italic;
     max-width: 32rem;
+  }
+
+  .entry-minimal__detail {
+    width: 40%;
+    margin-top: 2rem;
+  }
+
+  .entry-minimal__detail img {
+    width: 100%;
+    display: block;
+  }
+
+  .entry-minimal__note {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    font-style: italic;
+    max-width: 28rem;
+  }
+
+  /* Object Study: the caption/note read as a quiet handwritten-ish
+     annotation rather than a formal caption — serif instead of the
+     site's default sans, no new font loaded. */
+  .entry-minimal--object-study .entry-minimal__caption,
+  .entry-minimal--object-study .entry-minimal__note,
+  .entry-page--object-study :global(.figure__caption) {
+    font-family: var(--font-serif);
+  }
+
+  /* Photo Essay: more breathing room between figures, title kept quiet
+     so the photographs carry the page. */
+  .entry-page--photo-essay .entry-page__body :global(.figure) {
+    margin: 2.5rem 0;
+  }
+
+  .entry-page--photo-essay .entry-page__title {
+    font-size: 1.3rem;
+    font-weight: 400;
+  }
+
+  /* Editorial Article: a more pronounced, magazine-style headline. */
+  .entry-page--editorial .entry-page__title {
+    font-size: 2.3rem;
   }
 
   .entry-minimal__meta {
@@ -334,6 +423,19 @@ function tileWrapper(href: string | undefined) {
   }
 
   .collage-page__title {
+    font-family: var(--font-serif);
+    font-size: 1.9rem;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+  }
+
+  .contact-sheet-page {
+    max-width: var(--max-width);
+    padding-top: 2.5rem;
+    padding-bottom: 5rem;
+  }
+
+  .contact-sheet-page__title {
     font-family: var(--font-serif);
     font-size: 1.9rem;
     line-height: 1.2;

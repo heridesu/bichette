@@ -6,7 +6,7 @@ import { getCollection } from 'astro:content';
 // link — it picks a random entry at click time from a list baked in at
 // build time, so it works on a fully static site with no server involved.
 const entries = await getCollection('entries');
-const destinations = entries.map((entry) => `/entries/${entry.slug}`);
+const destinations = entries.filter((entry) => !entry.data.hidden).map((entry) => `/entries/${entry.slug}`);
 ---
 
 <header class="nav">

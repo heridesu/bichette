@@ -1,17 +1,40 @@
-import { useEffect, useState } from 'react';
-import type { Block, CollageData, EntryType, PageData, PageSummary } from './types';
+import { useEffect, useRef, useState } from 'react';
+import type { Block, CollageData, ContactSheetData, EntryType, PageData, PageStyle, PageSummary } from './types';
 import CollageEditor from './CollageEditor';
+import ContactSheetEditor from './ContactSheetEditor';
+import TemplatePicker from './TemplatePicker';
+import { applyTemplate, convertPageToCollage, type CollageTemplate, type TemplateImageInput } from '../../lib/collageTemplates';
 import { thumbSrc } from '../../lib/images';
+import FocalPointPicker from './FocalPointPicker';
+import PageStylePicker from './PageStylePicker';
 
 // One section the same size as the homepage's own default section
 // (DesktopEditor's addSection()) — a collage page should feel like the
-// same spacious working area, not a cramped square. More room always
-// means adding another section, never resizing this one.
+// same spacious working area, not a cramped square. This is the "Blank
+// canvas" choice in the template picker; its own height is freely
+// resizable afterward in CollageEditor.
 const DEFAULT_COLLAGE: CollageData = {
   sections: [{ canvasWidth: 1440, canvasHeight: 900, tiles: [], tape: [], tacks: [] }],
 };
 
+const DEFAULT_CONTACT_SHEET: ContactSheetData = { images: [], style: 'editorial' };
+
+function collectImages(collage: CollageData): TemplateImageInput[] {
+  const images: TemplateImageInput[] = [];
+  for (const section of collage.sections) {
+    for (const tile of section.tiles) {
+      if (tile.kind === 'image')
+        images.push({ src: tile.src, alt: tile.alt, aspect: tile.aspect, href: tile.href, border: tile.border, mat: tile.mat });
+    }
+  }
+  return images;
+}
+
 const TYPES: EntryType[] = ['photo', 'note', 'link', 'essay', 'observation', 'curiosity'];
+
+function genId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 async function uploadAsset(file: File): Promise<{ src: string; aspect?: string; kind: 'image' | 'video' }> {
   const form = new FormData();
@@ -37,11 +60,60 @@ export default function PagesEditor() {
   const [creating, setCreating] = useState(false);
   const [newType, setNewType] = useState<EntryType>('note');
   const [newTitle, setNewTitle] = useState('');
+  const [newPageStyle, setNewPageStyle] = useState<PageStyle | ''>('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // A page clicked in the sidebar while the open one has unsaved
+  // changes — held here until the user confirms discarding them, rather
+  // than switching (and silently losing the edits) right away.
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   // The slug the open page is actually saved under on disk — `current.slug`
   // becomes the editable "page URL" field, which may differ from this
   // while a rename is pending (not yet saved).
   const [originalSlug, setOriginalSlug] = useState<string | null>(null);
+  // A template the user just picked for a brand-new (not-yet-populated)
+  // collage page, waiting on images to fill it — see the "Add images to
+  // fill" step below. `pendingImages` accumulates as uploads complete.
+  const [pendingTemplate, setPendingTemplate] = useState<CollageTemplate | null>(null);
+  const [pendingImages, setPendingImages] = useState<TemplateImageInput[]>([]);
+  const [uploadingTemplateImages, setUploadingTemplateImages] = useState(false);
+  // Re-running the picker on a page that already has a layout — shows a
+  // replace-warning instead of silently discarding the current one.
+  const [changingTemplate, setChangingTemplate] = useState(false);
+  const [confirmingRevert, setConfirmingRevert] = useState(false);
+  // Hides every editing control so the page reads close to how it'll
+  // actually look — a pure view-state toggle over the same (possibly
+  // unsaved) data, never written back or saved itself.
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState<'desktop' | 'mobile'>('desktop');
+  // The collage exactly as it was when this page was last opened or
+  // saved — "Revert to Saved" resets just the canvas back to this,
+  // discarding any shuffles/edits made since without touching other
+  // fields (title, tags, etc.) that may also be mid-edit.
+  const savedCollageRef = useRef<CollageData | undefined>(undefined);
+  // Collapsing the page list gives the collage editor the full window
+  // width — handy since its canvas is a fixed 860px wide plus a sidebar.
+  // Persisted the same way `studio:tab`/`studio:openSlug` are, so it
+  // survives the full-page reload a save/create/delete triggers.
+  const [listCollapsed, setListCollapsed] = useState(() => {
+    try {
+      return sessionStorage.getItem('studio:pagesListCollapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  function toggleListCollapsed() {
+    setListCollapsed((prev) => {
+      const next = !prev;
+      try {
+        sessionStorage.setItem('studio:pagesListCollapsed', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
+
+  const [customTemplates, setCustomTemplates] = useState<CollageTemplate[]>([]);
 
   function refreshList() {
     fetch('/api/studio/pages')
@@ -49,8 +121,25 @@ export default function PagesEditor() {
       .then(setList);
   }
 
+  function refreshCustomTemplates() {
+    fetch('/api/studio/templates')
+      .then((r) => r.json())
+      .then(setCustomTemplates);
+  }
+
+  async function saveCustomTemplate(template: CollageTemplate) {
+    await fetch('/api/studio/templates', { method: 'POST', body: JSON.stringify(template) });
+    refreshCustomTemplates();
+  }
+
+  async function deleteCustomTemplate(id: string) {
+    await fetch(`/api/studio/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    refreshCustomTemplates();
+  }
+
   useEffect(() => {
     refreshList();
+    refreshCustomTemplates();
     // Saving, creating, renaming or deleting a page all write a file
     // under src/content/entries/, which makes Astro's dev server fully
     // reload every open tab (it can't hot-swap content collection data).
@@ -102,11 +191,13 @@ export default function PagesEditor() {
     const data = await res.json();
     setCurrent(data);
     setOriginalSlug(data.slug);
+    savedCollageRef.current = data.collage;
     rememberOpenSlug(data.slug);
     setDirty(false);
     setError(null);
     setCreating(false);
     setConfirmingDelete(false);
+    setConfirmingRevert(false);
     return true;
   }
 
@@ -114,13 +205,14 @@ export default function PagesEditor() {
     setCurrent(null);
     setNewType('note');
     setNewTitle('');
+    setNewPageStyle('');
     setCreating(true);
   }
 
   async function confirmCreate() {
     const res = await fetch('/api/studio/pages', {
       method: 'POST',
-      body: JSON.stringify({ type: newType, title: newTitle || undefined }),
+      body: JSON.stringify({ type: newType, title: newTitle || undefined, pageStyle: newPageStyle || undefined }),
     });
     const { slug } = await res.json();
     rememberOpenSlug(slug);
@@ -137,6 +229,44 @@ export default function PagesEditor() {
 
   function patchBlocks(blocks: Block[]) {
     patch({ blocks });
+  }
+
+  async function handleTemplateUploadFiles(files: FileList) {
+    setUploadingTemplateImages(true);
+    try {
+      for (const file of Array.from(files)) {
+        const { src, aspect } = await uploadAsset(file);
+        setPendingImages((prev) => [...prev, { src, aspect }]);
+      }
+    } finally {
+      setUploadingTemplateImages(false);
+    }
+  }
+
+  function finalizeTemplate(template: CollageTemplate, images: TemplateImageInput[]) {
+    const sections = applyTemplate(template, 0, images);
+    patch({ collage: { sections, templateId: template.id, templateVariant: 0 } });
+    setPendingTemplate(null);
+    setPendingImages([]);
+    setChangingTemplate(false);
+  }
+
+  // Resets just the canvas back to its last-saved (or last-opened, if
+  // never saved this session) state — lets shuffling/experimenting stay
+  // genuinely free of risk without needing to abandon the whole page.
+  function revertToSaved() {
+    patch({ collage: savedCollageRef.current });
+    setConfirmingRevert(false);
+  }
+
+  // "Change template" on a page that already has images: reflow its
+  // existing photos into the new template's slots rather than asking the
+  // user to re-upload anything. Non-image content (video/youtube/text,
+  // tape, tacks) doesn't carry over — the warning shown alongside the
+  // picker says so.
+  function applyTemplateReflow(template: CollageTemplate) {
+    const images = current?.collage ? collectImages(current.collage) : [];
+    finalizeTemplate(template, images);
   }
 
   async function handleSave() {
@@ -157,6 +287,7 @@ export default function PagesEditor() {
       setOriginalSlug(result.slug ?? current.slug);
       rememberOpenSlug(result.slug ?? current.slug);
       if (result.slug && result.slug !== current.slug) setCurrent({ ...current, slug: result.slug });
+      savedCollageRef.current = current.collage;
       setDirty(false);
       refreshList();
     } catch (e) {
@@ -164,6 +295,40 @@ export default function PagesEditor() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // The one-time migration path off the old "contact sheet as an Image
+  // Grid block" mechanism (Part 2) — builds a brand-new, standalone
+  // Contact Sheet page from that block's images, leaving the original
+  // Standard page and its block completely untouched.
+  async function convertImageGridToContactSheetPage(block: Block & { type: 'imagegrid' }) {
+    if (!current) return;
+    const title = current.title ? `${current.title} (contact sheet)` : undefined;
+    const createRes = await fetch('/api/studio/pages', {
+      method: 'POST',
+      body: JSON.stringify({ type: current.type, title }),
+    });
+    const { slug } = await createRes.json();
+    const contactSheet: ContactSheetData = {
+      style: 'editorial',
+      images: block.images.map((img) => ({ id: genId(), src: img.src, alt: img.alt, caption: img.caption })),
+    };
+    await fetch('/api/studio/pages', {
+      method: 'PUT',
+      body: JSON.stringify({
+        slug,
+        originalSlug: slug,
+        type: current.type,
+        date: new Date().toISOString().slice(0, 10),
+        title,
+        template: 'contact-sheet',
+        contactSheet,
+        blocks: [],
+      }),
+    });
+    refreshList();
+    rememberOpenSlug(slug);
+    await open(slug, 5);
   }
 
   async function handleDelete() {
@@ -182,26 +347,67 @@ export default function PagesEditor() {
     refreshList();
   }
 
+  // Clicking a different page in the sidebar: switch right away if
+  // there's nothing unsaved to lose, otherwise hold it until confirmed.
+  function selectPage(slug: string) {
+    if (slug === originalSlug) return;
+    if (dirty) {
+      setPendingSlug(slug);
+      return;
+    }
+    open(slug);
+  }
+
+  function confirmSwitchPage() {
+    const slug = pendingSlug;
+    setPendingSlug(null);
+    if (slug) open(slug);
+  }
+
   return (
     <div className="studio__body">
-      <div className="studio__pages-list">
-        <button className="studio__btn studio__btn--primary" style={{ width: '100%', marginBottom: '0.75rem' }} onClick={startCreate}>
-          + New page
+      {listCollapsed ? (
+        <button className="studio__pages-list-expand" onClick={toggleListCollapsed} title="Show page list">
+          ▶
         </button>
-        {list.map((p) => (
-          <button
-            key={p.slug}
-            className={`studio__page-row${originalSlug === p.slug ? ' studio__page-row--active' : ''}`}
-            onClick={() => open(p.slug)}
-          >
-            {p.image && <img src={thumbSrc(p.image)} alt="" />}
-            <span>
-              <strong>{p.title ?? p.slug}</strong>
-              <small>{p.type}</small>
-            </span>
-          </button>
-        ))}
-      </div>
+      ) : (
+        <div className="studio__pages-list">
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
+            <button className="studio__btn studio__btn--primary" style={{ flex: '1 1 auto' }} onClick={startCreate}>
+              + New page
+            </button>
+            <button className="studio__btn" onClick={toggleListCollapsed} title="Collapse page list">
+              ◀
+            </button>
+          </div>
+          {pendingSlug && (
+            <div className="studio__field" style={{ marginBottom: '0.75rem' }}>
+              <p className="studio__status">Discard unsaved changes and switch pages?</p>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="studio__btn studio__btn--danger" onClick={confirmSwitchPage}>
+                  Yes, discard
+                </button>
+                <button className="studio__btn" onClick={() => setPendingSlug(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {list.map((p) => (
+            <button
+              key={p.slug}
+              className={`studio__page-row${originalSlug === p.slug ? ' studio__page-row--active' : ''}`}
+              onClick={() => selectPage(p.slug)}
+            >
+              {p.image && <img src={thumbSrc(p.image)} alt="" />}
+              <span>
+                <strong>{p.title ?? p.slug}</strong>
+                <small>{p.type}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="studio__page-content">
         {creating ? (
@@ -220,6 +426,10 @@ export default function PagesEditor() {
               <label>Title (optional)</label>
               <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
             </div>
+            <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
+              <label>Page style (optional)</label>
+              <PageStylePicker value={newPageStyle || undefined} onChange={(v) => setNewPageStyle(v ?? '')} />
+            </div>
             <div style={{ gridColumn: '1 / 3', display: 'flex', gap: '0.5rem' }}>
               <button className="studio__btn studio__btn--primary" onClick={confirmCreate}>
                 Create
@@ -237,9 +447,52 @@ export default function PagesEditor() {
               <a href={`http://localhost:4321/entries/${originalSlug}`} target="_blank" rel="noopener noreferrer" className="studio__btn">
                 Preview ↗
               </a>
+              <button
+                className={`studio__btn${previewMode ? ' studio__btn--primary' : ''}`}
+                onClick={() => setPreviewMode((v) => !v)}
+              >
+                {previewMode ? 'Exit preview' : 'Preview'}
+              </button>
+              {previewMode && (
+                <>
+                  <button
+                    className={`studio__btn${previewWidth === 'desktop' ? ' studio__btn--primary' : ''}`}
+                    onClick={() => setPreviewWidth('desktop')}
+                  >
+                    Desktop
+                  </button>
+                  <button
+                    className={`studio__btn${previewWidth === 'mobile' ? ' studio__btn--primary' : ''}`}
+                    onClick={() => setPreviewWidth('mobile')}
+                  >
+                    Mobile
+                  </button>
+                </>
+              )}
+              <label className="studio__lock-toggle" title="Keeps this page off the nav's random 'elsewhere' link — still reachable at its own URL.">
+                <input type="checkbox" checked={current.hidden ?? false} onChange={(e) => patch({ hidden: e.target.checked || undefined })} />
+                Hidden (skip in &ldquo;elsewhere&rdquo;)
+              </label>
               <div className="studio__spacer" />
               {error && <span className="studio__status" style={{ color: '#b42318' }}>{error}</span>}
               {dirty && <span className="studio__status">Unsaved changes</span>}
+              {current.template === 'collage' &&
+                current.collage &&
+                (confirmingRevert ? (
+                  <>
+                    <span className="studio__status">Discard changes to the canvas since it was last saved?</span>
+                    <button className="studio__btn studio__btn--danger" onClick={revertToSaved}>
+                      Yes, revert
+                    </button>
+                    <button className="studio__btn" onClick={() => setConfirmingRevert(false)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button className="studio__btn" onClick={() => setConfirmingRevert(true)}>
+                    Revert to saved
+                  </button>
+                ))}
               {confirmingDelete ? (
                 <>
                   <span className="studio__status">Delete this page permanently?</span>
@@ -260,23 +513,118 @@ export default function PagesEditor() {
               </button>
             </div>
 
-            <div style={{ maxWidth: 640 }}>
-              <FieldForm page={current} onChange={patch} />
-            </div>
+            {!previewMode && (
+              <div style={{ maxWidth: 640 }}>
+                <FieldForm page={current} onChange={patch} />
+              </div>
+            )}
 
             {current.template === 'collage' ? (
               <>
                 <h3 style={{ marginTop: '2rem' }}>Collage layout</h3>
-                <CollageEditor
-                  collage={current.collage ?? DEFAULT_COLLAGE}
-                  onChange={(collage) => patch({ collage })}
+                {!current.collage && !pendingTemplate ? (
+                  <TemplatePicker
+                    context="entry"
+                    onPick={(t) => setPendingTemplate(t)}
+                    onBlank={() => patch({ collage: DEFAULT_COLLAGE })}
+                    customTemplates={customTemplates}
+                    onDeleteCustom={deleteCustomTemplate}
+                  />
+                ) : !current.collage && pendingTemplate ? (
+                  <div className="studio__field" style={{ maxWidth: 480 }}>
+                    <p className="studio__status">
+                      Add images to fill &ldquo;{pendingTemplate.name}&rdquo;
+                      {pendingImages.length > 0 ? ` — ${pendingImages.length} added so far` : ''}.
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={uploadingTemplateImages}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) handleTemplateUploadFiles(e.target.files);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                      <button
+                        className="studio__btn studio__btn--primary"
+                        disabled={pendingImages.length === 0 || uploadingTemplateImages}
+                        onClick={() => finalizeTemplate(pendingTemplate, pendingImages)}
+                      >
+                        Apply with {pendingImages.length} image{pendingImages.length === 1 ? '' : 's'}
+                      </button>
+                      <button
+                        className="studio__btn"
+                        onClick={() => {
+                          setPendingTemplate(null);
+                          setPendingImages([]);
+                        }}
+                      >
+                        Back
+                      </button>
+                    </div>
+                  </div>
+                ) : changingTemplate ? (
+                  <>
+                    {current.collage && collectImages(current.collage).length > 0 && (
+                      <p className="studio__status" style={{ marginBottom: '0.5rem' }}>
+                        This replaces the current layout — your {collectImages(current.collage).length} photo
+                        {collectImages(current.collage).length === 1 ? '' : 's'} will be reflowed into the new
+                        arrangement; any video, text, or decorations won&rsquo;t carry over.
+                      </p>
+                    )}
+                    <TemplatePicker
+                      context="entry"
+                      onPick={(t) => applyTemplateReflow(t)}
+                      onBlank={() => {
+                        patch({ collage: DEFAULT_COLLAGE });
+                        setChangingTemplate(false);
+                      }}
+                      onCancel={() => setChangingTemplate(false)}
+                      customTemplates={customTemplates}
+                      onDeleteCustom={deleteCustomTemplate}
+                    />
+                  </>
+                ) : (
+                  <>
+                    {!previewMode && (
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <button className="studio__btn" onClick={() => setChangingTemplate(true)}>
+                          Change template…
+                        </button>
+                      </div>
+                    )}
+                    <CollageEditor
+                      collage={current.collage ?? DEFAULT_COLLAGE}
+                      onChange={(collage) => patch({ collage })}
+                      onUpload={uploadAsset}
+                      customTemplates={customTemplates}
+                      onSaveTemplate={saveCustomTemplate}
+                      previewMode={previewMode}
+                      previewWidth={previewWidth}
+                    />
+                  </>
+                )}
+              </>
+            ) : current.template === 'contact-sheet' ? (
+              <>
+                <h3 style={{ marginTop: '2rem' }}>Contact Sheet</h3>
+                <ContactSheetEditor
+                  data={current.contactSheet ?? DEFAULT_CONTACT_SHEET}
+                  onChange={(contactSheet) => patch({ contactSheet })}
                   onUpload={uploadAsset}
+                  previewMode={previewMode}
                 />
               </>
+            ) : previewMode ? (
+              <div style={{ maxWidth: previewWidth === 'mobile' ? 390 : 640, margin: previewWidth === 'mobile' ? '0 auto' : undefined }}>
+                <BlockPreview page={current} />
+              </div>
             ) : (
               <div style={{ maxWidth: 640 }}>
                 <h3 style={{ marginTop: '2rem' }}>Content</h3>
-                <BlockEditor blocks={current.blocks} onChange={patchBlocks} />
+                <BlockEditor blocks={current.blocks} onChange={patchBlocks} onConvertToContactSheet={convertImageGridToContactSheetPage} />
               </div>
             )}
           </>
@@ -292,6 +640,14 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
     onChange({ image: previewUrl });
     const { src, aspect } = await uploadAsset(file);
     onChange({ image: src, aspect: aspect ?? page.aspect });
+    URL.revokeObjectURL(previewUrl);
+  }
+
+  async function handleDetailImageUpload(file: File) {
+    const previewUrl = URL.createObjectURL(file);
+    onChange({ detailImage: previewUrl });
+    const { src } = await uploadAsset(file);
+    onChange({ detailImage: src });
     URL.revokeObjectURL(previewUrl);
   }
 
@@ -312,13 +668,27 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
         <select
           value={page.template ?? 'standard'}
           onChange={(e) => {
-            const template = e.target.value as 'standard' | 'collage';
-            onChange({ template, collage: template === 'collage' ? page.collage ?? DEFAULT_COLLAGE : page.collage });
+            const template = e.target.value as 'standard' | 'collage' | 'contact-sheet';
+            // Moving from Standard to Collage on a page that already has
+            // a lead image or body content: carry all of it over as real
+            // tiles rather than dropping it behind a blank/template
+            // picker. A page with nothing yet still gets the normal
+            // picker (there's nothing to lose).
+            if (template === 'collage' && !page.collage && (page.image || page.blocks.length > 0)) {
+              onChange({ template, collage: convertPageToCollage(page) });
+            } else {
+              onChange({ template });
+            }
           }}
         >
           <option value="standard">Standard</option>
           <option value="collage">Collage (drag &amp; drop)</option>
+          <option value="contact-sheet">Contact Sheet</option>
         </select>
+      </div>
+      <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
+        <label>Page style (optional)</label>
+        <PageStylePicker value={page.pageStyle} onChange={(v) => onChange({ pageStyle: v })} />
       </div>
       <div className="studio__field">
         <label>Date</label>
@@ -346,6 +716,13 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
         <input value={page.caption ?? ''} onChange={(e) => onChange({ caption: e.target.value || undefined })} />
       </div>
 
+      {page.pageStyle === 'single-image' && (
+        <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
+          <label>Note (optional) — a short aside, separate from the caption above</label>
+          <input value={page.note ?? ''} onChange={(e) => onChange({ note: e.target.value || undefined })} />
+        </div>
+      )}
+
       <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
         <label>Lead image</label>
         {page.image && <img src={thumbSrc(page.image)} alt="" className="studio__thumb" style={{ marginBottom: '0.5rem' }} />}
@@ -364,6 +741,39 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
           </button>
         )}
       </div>
+
+      {page.pageStyle === 'single-image' && (
+        <div className="studio__field" style={{ gridColumn: '1 / 3' }}>
+          <label>Detail photo (optional) — a second, smaller photo shown below</label>
+          {page.detailImage && (
+            <img src={thumbSrc(page.detailImage)} alt="" className="studio__thumb" style={{ marginBottom: '0.5rem' }} />
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleDetailImageUpload(file);
+              e.currentTarget.value = '';
+            }}
+          />
+          <input
+            placeholder="Alt text (optional)"
+            style={{ marginTop: '0.5rem' }}
+            value={page.detailImageAlt ?? ''}
+            onChange={(e) => onChange({ detailImageAlt: e.target.value || undefined })}
+          />
+          {page.detailImage && (
+            <button
+              className="studio__btn"
+              style={{ marginTop: '0.5rem' }}
+              onClick={() => onChange({ detailImage: undefined, detailImageAlt: undefined })}
+            >
+              Remove detail photo
+            </button>
+          )}
+        </div>
+      )}
 
       {page.type === 'link' && (
         <>
@@ -396,7 +806,112 @@ function FieldForm({ page, onChange }: { page: PageData; onChange: (f: Partial<P
   );
 }
 
-function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Block[]) => void }) {
+// Read-only approximation of the live Standard-page render, shown when
+// Preview mode is on. Deliberately NOT byte-identical to entries/
+// [slug].astro — that page's typography lives in its own Astro-scoped
+// <style>, which a React component here can't import — but it shows the
+// same title/figure/body-block content and order so composition and
+// flow can be judged before saving.
+function BlockPreview({ page }: { page: PageData }) {
+  return (
+    <div style={{ fontFamily: 'Georgia, serif' }}>
+      {page.title && <h1 style={{ fontSize: '1.9rem', marginBottom: '0.5rem' }}>{page.title}</h1>}
+      {page.location && <p style={{ fontSize: '0.85rem', color: '#9a9a9a', marginBottom: '0.5rem' }}>{page.location}</p>}
+      {page.image && <img src={thumbSrc(page.image)} alt={page.imageAlt ?? ''} style={{ width: '100%', display: 'block', marginBottom: '0.5rem' }} />}
+      {page.caption && <p style={{ fontStyle: 'italic', color: '#5a5a5a', margin: '1rem 0' }}>{page.caption}</p>}
+      {page.blocks.map((block, i) => (
+        <div key={i} style={{ margin: '1rem 0' }}>
+          <BlockPreviewBody block={block} />
+        </div>
+      ))}
+      {page.url && (
+        <p style={{ marginTop: '1.5rem' }}>
+          <a href={page.url} target="_blank" rel="noopener noreferrer">
+            visit the source ↗
+          </a>
+        </p>
+      )}
+      {page.tags && page.tags.length > 0 && (
+        <ul style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: '0.6rem', margin: '2rem 0 0', padding: 0, fontSize: '0.68rem', color: '#9a9a9a' }}>
+          {page.tags.map((tag) => (
+            <li key={tag}>{tag}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function BlockPreviewBody({ block }: { block: Block }) {
+  if (block.type === 'paragraph' || block.type === 'raw') {
+    return <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>{block.text}</p>;
+  }
+  if (block.type === 'quote') {
+    return <blockquote style={{ fontStyle: 'italic', margin: 0, paddingLeft: '1rem', borderLeft: '2px solid #ddd' }}>{block.text}</blockquote>;
+  }
+  if (block.type === 'list') {
+    const Tag = block.ordered ? 'ol' : 'ul';
+    return (
+      <Tag>
+        {block.items.map((item, i) => (
+          <li key={i}>{item}</li>
+        ))}
+      </Tag>
+    );
+  }
+  if (block.type === 'image') {
+    return (
+      <figure style={{ margin: 0, width: block.width && block.width < 100 ? `${block.width}%` : '100%' }}>
+        {block.src && <img src={thumbSrc(block.src)} alt={block.alt ?? ''} style={{ width: '100%', display: 'block' }} />}
+        {block.caption && <figcaption style={{ fontSize: '0.82rem', color: '#5a5a5a', fontStyle: 'italic', marginTop: '0.5rem' }}>{block.caption}</figcaption>}
+      </figure>
+    );
+  }
+  if (block.type === 'imagegrid') {
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${block.cols}, 1fr)`,
+          gap: block.style === 'contact-sheet' ? '0.25rem' : '1rem',
+        }}
+      >
+        {block.images.map((img, i) => (
+          <img
+            key={i}
+            src={thumbSrc(img.src)}
+            alt={img.alt ?? ''}
+            style={{ width: '100%', aspectRatio: block.style === 'contact-sheet' ? '1' : undefined, objectFit: 'cover', display: 'block' }}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (block.type === 'video') {
+    return <video src={block.src} controls style={{ width: '100%', display: 'block', background: '#000' }} />;
+  }
+  if (block.type === 'youtube') {
+    return <div className="studio__tile-placeholder">YouTube: {block.url || '(no URL set)'}</div>;
+  }
+  return null;
+}
+
+function BlockEditor({
+  blocks,
+  onChange,
+  onConvertToContactSheet,
+}: {
+  blocks: Block[];
+  onChange: (b: Block[]) => void;
+  onConvertToContactSheet?: (block: Block & { type: 'imagegrid' }) => void;
+}) {
+  // Lets handleAddImages read the latest blocks across an `await` — the
+  // `blocks` prop captured in that closure is stale the moment a second
+  // upload in the same batch resolves after the first one's onChange has
+  // already re-rendered this component with a new array.
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+
   function update(index: number, block: Block) {
     onChange(blocks.map((b, i) => (i === index ? block : b)));
   }
@@ -408,6 +923,24 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
   }
   function add(block: Block) {
     onChange([...blocks, block]);
+  }
+
+  // "+ Image" adds one fully-formed Image block per file picked, instead
+  // of one empty block the user then has to fill in one at a time — a
+  // preview blob shows immediately, swapped for the real uploaded path
+  // once each upload resolves.
+  async function addImages(files: FileList) {
+    const picked = Array.from(files);
+    if (picked.length === 0) return;
+    const startIndex = blocksRef.current.length;
+    const previews = picked.map((file) => URL.createObjectURL(file));
+    onChange([...blocksRef.current, ...previews.map((src): Block => ({ type: 'image', src }))]);
+    for (let i = 0; i < picked.length; i++) {
+      const { src, aspect } = await uploadAsset(picked[i]);
+      const index = startIndex + i;
+      onChange(blocksRef.current.map((b, bi) => (bi === index ? ({ ...b, src, aspect } as Block) : b)));
+      URL.revokeObjectURL(previews[i]);
+    }
   }
 
   return (
@@ -428,6 +961,11 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
           <div className="studio__block-body">
             <div className="studio__block-label">{block.type}</div>
             <BlockBody block={block} onChange={(b) => update(i, b)} />
+            {block.type === 'imagegrid' && block.style === 'contact-sheet' && onConvertToContactSheet && (
+              <button className="studio__btn" style={{ marginTop: '0.5rem' }} onClick={() => onConvertToContactSheet(block)}>
+                Convert to Contact Sheet page…
+              </button>
+            )}
           </div>
         </div>
       ))}
@@ -436,9 +974,19 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
         <button className="studio__btn" onClick={() => add({ type: 'paragraph', text: '' })}>
           + Paragraph
         </button>
-        <button className="studio__btn" onClick={() => add({ type: 'image', src: '' })}>
+        <label className="studio__btn">
           + Image
-        </button>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files) addImages(e.target.files);
+              e.currentTarget.value = '';
+            }}
+          />
+        </label>
         <button className="studio__btn" onClick={() => add({ type: 'imagegrid', cols: 2, images: [] })}>
           + Image grid
         </button>
@@ -460,6 +1008,11 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
 }
 
 function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
+  // Same stale-closure problem as BlockEditor.addImages, one level down —
+  // needed by the imagegrid branch's multi-file upload below.
+  const blockRef = useRef(block);
+  blockRef.current = block;
+
   if (block.type === 'paragraph') {
     return <textarea rows={3} value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />;
   }
@@ -503,7 +1056,14 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
   if (block.type === 'image') {
     return (
       <div>
-        {block.src && <img src={thumbSrc(block.src)} alt="" className="studio__thumb" />}
+        {block.src && (
+          <FocalPointPicker
+            src={block.src}
+            focalX={block.focalX}
+            focalY={block.focalY}
+            onChange={(focalX, focalY) => onChange({ ...block, focalX, focalY })}
+          />
+        )}
         <input
           type="file"
           accept="image/*"
@@ -548,6 +1108,19 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
           <input type="checkbox" checked={block.border ?? false} onChange={(e) => onChange({ ...block, border: e.target.checked || undefined })} />{' '}
           Thin black border
         </label>
+        {block.border && (
+          <label style={{ fontSize: '0.7rem', color: '#666', display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: '1.3rem' }}>
+            Thickness (px)
+            <input
+              type="number"
+              min={1}
+              max={10}
+              style={{ width: '4rem', padding: '0.2rem 0.3rem', border: '1px solid #ccc', borderRadius: 4 }}
+              value={block.borderWidth ?? 2}
+              onChange={(e) => onChange({ ...block, borderWidth: parseInt(e.target.value, 10) || 2 })}
+            />
+          </label>
+        )}
         <label style={{ fontSize: '0.72rem', color: '#666', display: 'block' }}>
           <input type="checkbox" checked={block.mat ?? false} onChange={(e) => onChange({ ...block, mat: e.target.checked || undefined })} />{' '}
           White mat/padding
@@ -619,10 +1192,31 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
             onChange={(e) => onChange({ ...block, cols: parseInt(e.target.value, 10) || 1 })}
           />
         </div>
+        <div className="studio__field" style={{ maxWidth: 220 }}>
+          <label>Style</label>
+          <select
+            value={block.style ?? 'grid'}
+            onChange={(e) => onChange({ ...block, style: e.target.value as 'grid' | 'contact-sheet' })}
+          >
+            <option value="grid">Grid (captions, your own spacing)</option>
+            <option value="contact-sheet">Contact sheet (uniform squares, no captions)</option>
+          </select>
+        </div>
         <div className="studio__imagegrid-items">
           {block.images.map((img, i) => (
             <div key={i} className="studio__row-item">
-              {img.src && <img src={thumbSrc(img.src)} alt="" />}
+              {img.src && (
+                <FocalPointPicker
+                  compact
+                  src={img.src}
+                  focalX={img.focalX}
+                  focalY={img.focalY}
+                  onChange={(focalX, focalY) => {
+                    const images = block.images.map((im, idx) => (idx === i ? { ...im, focalX, focalY } : im));
+                    onChange({ ...block, images });
+                  }}
+                />
+              )}
               <div className="studio__row-item-fields">
                 <input
                   placeholder="Caption (optional)"
@@ -634,12 +1228,27 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
                 />
                 <input
                   placeholder="Link (optional)"
+                  disabled={img.lightbox}
                   value={img.href ?? ''}
                   onChange={(e) => {
                     const images = block.images.map((im, idx) => (idx === i ? { ...im, href: e.target.value || undefined } : im));
                     onChange({ ...block, images });
                   }}
                 />
+                <label style={{ fontSize: '0.72rem', color: '#666' }}>
+                  <input
+                    type="checkbox"
+                    checked={img.lightbox ?? false}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      const images = block.images.map((im, idx) =>
+                        idx === i ? { ...im, lightbox: checked || undefined, href: checked ? undefined : im.href } : im,
+                      );
+                      onChange({ ...block, images });
+                    }}
+                  />{' '}
+                  Lightbox (opens full-screen instead of a link)
+                </label>
               </div>
               <button
                 className="studio__icon-btn"
@@ -653,16 +1262,22 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
         <input
           type="file"
           accept="image/*"
+          multiple
           onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (file) {
+            const files = Array.from(e.target.files ?? []);
+            e.currentTarget.value = '';
+            for (const file of files) {
               const previewUrl = URL.createObjectURL(file);
-              onChange({ ...block, images: [...block.images, { src: previewUrl }] });
+              const current = blockRef.current as typeof block;
+              onChange({ ...current, images: [...current.images, { src: previewUrl }] });
               const { src } = await uploadAsset(file);
-              onChange({ ...block, images: [...block.images, { src }] });
+              const withPreview = blockRef.current as typeof block;
+              onChange({
+                ...withPreview,
+                images: withPreview.images.map((im) => (im.src === previewUrl ? { ...im, src } : im)),
+              });
               URL.revokeObjectURL(previewUrl);
             }
-            e.currentTarget.value = '';
           }}
         />
       </div>

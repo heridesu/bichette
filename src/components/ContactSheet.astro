@@ -1,0 +1,143 @@
+---
+import type { ContactSheetAspect, ContactSheetData, ContactSheetStyle } from './studio/types';
+import { responsiveSrcSet } from '../lib/images';
+
+interface Props {
+  data: ContactSheetData;
+  /** Lightbox group id — every cell in this sheet shares it, so opening
+      one gets prev/next navigation across the whole sheet. */
+  groupId: string;
+}
+
+const { data, groupId } = Astro.props;
+
+const STYLE_DEFAULTS: Record<ContactSheetStyle, { gapX: number; gapY: number; aspect: ContactSheetAspect }> = {
+  editorial: { gapX: 6, gapY: 6, aspect: 'portrait' },
+  compact: { gapX: 2, gapY: 2, aspect: 'square' },
+  film: { gapX: 4, gapY: 4, aspect: 'original' },
+};
+
+const defaults = STYLE_DEFAULTS[data.style];
+const columnsDesktop = data.columnsDesktop ?? 3;
+const columnsMobile = data.columnsMobile ?? 2;
+const gapX = data.gapX ?? defaults.gapX;
+const gapY = data.gapY ?? defaults.gapY;
+const aspect = data.aspect ?? defaults.aspect;
+
+const ASPECT_RATIO: Record<ContactSheetAspect, string | undefined> = {
+  original: undefined,
+  square: '1',
+  portrait: '4 / 5',
+  landscape: '3 / 2',
+};
+const aspectRatio = ASPECT_RATIO[aspect];
+---
+
+<div
+  class={`contact-sheet contact-sheet--${data.style}`}
+  data-aspect={aspect}
+  style={`--cols-desktop:${columnsDesktop};--cols-mobile:${columnsMobile};--gap-x:${gapX}px;--gap-y:${gapY}px;`}
+>
+  {data.images.map((image, i) => (
+    <figure class="contact-sheet__cell">
+      <div
+        class="contact-sheet__frame"
+        style={aspectRatio ? `aspect-ratio:${aspectRatio};` : ''}
+        role="button"
+        tabindex={0}
+        data-lightbox-src={image.src}
+        data-lightbox-alt={image.alt ?? ''}
+        data-lightbox-group={groupId}
+        aria-label="View image full size"
+      >
+        <img
+          src={image.src}
+          srcset={responsiveSrcSet(image.src)}
+          sizes={`(max-width: 640px) calc(100vw / ${columnsMobile}), calc(1400px / ${columnsDesktop})`}
+          alt={image.alt ?? ''}
+          loading={i < 6 ? 'eager' : 'lazy'}
+          style={`object-position:${image.focalX ?? 50}% ${image.focalY ?? 50}%;`}
+        />
+      </div>
+      {data.showCaptions && image.caption && <figcaption class="contact-sheet__caption">{image.caption}</figcaption>}
+      {data.style === 'film' && data.showFrameNumbers && (
+        <p class="contact-sheet__framenum">{String(i + 1).padStart(2, '0')}</p>
+      )}
+    </figure>
+  ))}
+</div>
+
+<style>
+  .contact-sheet {
+    display: grid;
+    grid-template-columns: repeat(var(--cols-desktop), 1fr);
+    gap: var(--gap-y) var(--gap-x);
+  }
+
+  @media (max-width: 640px) {
+    .contact-sheet {
+      grid-template-columns: repeat(var(--cols-mobile), 1fr);
+    }
+  }
+
+  .contact-sheet__cell {
+    margin: 0;
+  }
+
+  .contact-sheet__frame {
+    display: block;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--line);
+  }
+
+  .contact-sheet__frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* 'original' aspect: no forced crop — the image keeps its own shape. */
+  .contact-sheet[data-aspect='original'] .contact-sheet__frame img {
+    height: auto;
+    object-fit: initial;
+  }
+
+  .contact-sheet__frame:hover img {
+    opacity: 0.9;
+  }
+
+  .contact-sheet__caption {
+    margin: 0.4rem 0 0;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  /* Film: a dark proof-sheet backdrop scoped to the sheet itself, not
+     the page — thin frames around each photo, optional frame numbers. */
+  .contact-sheet--film {
+    background: #1a1a1a;
+    padding: var(--gap-y) var(--gap-x);
+    border-radius: 2px;
+  }
+
+  .contact-sheet--film .contact-sheet__frame {
+    border: 1px solid #3a3a3a;
+    background: #111;
+  }
+
+  .contact-sheet--film .contact-sheet__caption {
+    color: #999;
+  }
+
+  .contact-sheet__framenum {
+    margin: 0.3rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+    color: #777;
+  }
+</style>

@@ -261,6 +261,49 @@
   background: #eee;
 }
 
+.studio__focal-picker {
+  position: relative;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  line-height: 0;
+}
+
+.studio__focal-picker img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  background: #eee;
+  cursor: crosshair;
+}
+
+.studio__focal-picker--compact {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.studio__focal-picker--compact img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.studio__focal-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #2456d6, 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: rgba(36, 86, 214, 0.6);
+  pointer-events: none;
+}
+
 .studio__empty {
   font-size: 0.82rem;
   color: #888;
@@ -390,6 +433,24 @@
 .studio__pages-list {
   width: 260px;
   flex: 0 0 auto;
+}
+
+.studio__pages-list-expand {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 28px;
+  height: 36px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.studio__pages-list-expand:hover {
+  border-color: #999;
+  color: #141414;
 }
 
 .studio__page-row {
@@ -539,8 +600,16 @@
 
 .deco-canvas {
   position: relative;
-  background: repeating-conic-gradient(#eee 0% 25%, #f6f6f4 0% 50%) 50% / 20px 20px;
+  /* White by default — judging a composition against the same paper
+     white the live site uses matters more day-to-day than seeing
+     transparency, which is rare in a photo collage. The checkerboard is
+     one click away via the toolbar toggle. */
+  background: #fff;
   border: 1px solid #ddd;
+}
+
+.deco-canvas--checkerboard {
+  background: repeating-conic-gradient(#eee 0% 25%, #f6f6f4 0% 50%) 50% / 20px 20px;
 }
 
 .deco-tile {
@@ -557,7 +626,9 @@
 }
 
 .deco-tile--bordered {
-  border: 2px solid #141414;
+  border-style: solid;
+  border-color: #141414;
+  border-width: 2px; /* overridden inline when a tile sets its own borderWidth */
 }
 
 .deco-tile--matted {
@@ -592,4 +663,373 @@
   font-size: 0.95rem;
   line-height: 1.4;
   pointer-events: none;
+}
+
+.deco-tile__text--small {
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.deco-tile__text--large {
+  font-size: 1.3rem;
+  line-height: 1.3;
+}
+
+.deco-tile__text--headline {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.deco-tile__text--uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* A text tile a template placed but the user hasn't written into yet —
+   Studio shows a quiet hint so it's clear something goes here; the
+   public site never renders an empty text tile at all (see
+   src/pages/entries/[slug].astro), so this never ships as if it were
+   real content. */
+.deco-tile__text--empty {
+  border: 1px dashed #ddd;
+  box-sizing: border-box;
+}
+
+.deco-tile__text--empty::before {
+  content: 'Add a caption…';
+  color: #aaa;
+  font-style: italic;
+}
+
+/* Locked elements — Shuffle Images/Layout and manual drag/resize all
+   leave these alone. Studio-only: the public site never reads `locked`
+   at all, so nothing here can leak into the live page. */
+.studio__item--locked {
+  outline: 2px dashed #999;
+  outline-offset: -2px;
+}
+
+.studio__lock-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.85rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+}
+
+.studio__lock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #444;
+  cursor: pointer;
+}
+
+/* Collage editor's own top-level toolbar — Shuffle Images/Layout, the
+   template-family switcher, Undo/Redo, and the checkerboard toggle. Kept
+   to one row of plain buttons, matching the rest of Studio's utilitarian
+   look rather than introducing a new UI style. */
+.studio__shuffle-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.studio__shuffle-family {
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 0.82rem;
+}
+
+.studio__template-name-input {
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 0.82rem;
+  width: 160px;
+}
+
+.studio__checkerboard-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #666;
+  cursor: pointer;
+}
+
+.studio__template-picker {
+  margin: 1rem 0 2rem;
+}
+
+.studio__template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.studio__template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.studio__template-card:hover {
+  border-color: #888;
+}
+
+.studio__template-card--custom {
+  position: relative;
+  cursor: default;
+}
+
+.studio__template-card-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.studio__template-card--custom .studio__icon-btn {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  background: #fff;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.studio__template-card strong {
+  font-size: 0.82rem;
+}
+
+.studio__template-card span {
+  font-size: 0.72rem;
+  color: #666;
+  line-height: 1.3;
+}
+
+.studio__template-preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f6f6f4;
+}
+
+.studio__template-card--blank {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.studio__pagestyle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 0.6rem;
+  max-width: 480px;
+  margin-bottom: 0.5rem;
+}
+
+.studio__pagestyle-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.studio__pagestyle-card:hover {
+  border-color: #888;
+}
+
+.studio__pagestyle-card--active {
+  border-color: #2456d6;
+  box-shadow: 0 0 0 1px #2456d6;
+}
+
+.studio__pagestyle-card strong {
+  font-size: 0.66rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.studio__pagestyle-diagram {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  background: #f6f6f4;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.studio__pagestyle-diagram svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.studio__pagestyle-diagram--none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bbb;
+  font-size: 1.4rem;
+}
+
+.studio__template-blank-icon {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #aaa;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+}
+
+/* Contact Sheet — the editor renders the SAME grid as the live site
+   (.contact-sheet / .contact-sheet__frame / .contact-sheet--film), so
+   style/gap/aspect changes are the preview, not a separate thing kept
+   in sync with it. Identical rules to src/components/ContactSheet.astro,
+   same dual-definition pattern already used for .deco-canvas/.deco-tile. */
+.contact-sheet {
+  display: grid;
+  grid-template-columns: repeat(var(--cols-desktop), 1fr);
+  gap: var(--gap-y) var(--gap-x);
+}
+
+.contact-sheet__cell {
+  margin: 0;
+  position: relative;
+}
+
+.contact-sheet__frame {
+  display: block;
+  overflow: hidden;
+  cursor: pointer;
+  background: #eee;
+}
+
+.contact-sheet__frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.contact-sheet[data-aspect='original'] .contact-sheet__frame img {
+  height: auto;
+  object-fit: initial;
+}
+
+.contact-sheet--film {
+  background: #1a1a1a;
+  padding: var(--gap-y) var(--gap-x);
+  border-radius: 2px;
+}
+
+.contact-sheet--film .contact-sheet__frame {
+  border: 1px solid #3a3a3a;
+}
+
+.contact-sheet__caption {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: #5a5a5a;
+  font-style: italic;
+}
+
+.studio__contact-sheet-cell--selected .contact-sheet__frame {
+  outline: 2px solid #2456d6;
+  outline-offset: -2px;
+}
+
+.studio__contact-sheet-cell--dragging {
+  opacity: 0.4;
+}
+
+.studio__contact-sheet-remove {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+  z-index: 2;
+}
+
+.studio__contact-sheet-remove:hover {
+  background: rgba(180, 35, 24, 0.9);
+}
+
+.studio__medialibrary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 0.4rem;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  margin-bottom: 0.5rem;
+}
+
+.studio__medialibrary-grid button {
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+}
+
+.studio__medialibrary-grid button:hover {
+  border-color: #2456d6;
+}
+
+.studio__medialibrary-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
 }

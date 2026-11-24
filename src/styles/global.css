@@ -94,6 +94,14 @@ h1, h2, h3, p {
   position: relative;
 }
 
+/* Breaks a section out to the full viewport width instead of sitting
+   inside .wrap's max-width/gutter — the standard full-bleed technique. */
+.deco-canvas--full-bleed {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+}
+
 .deco-tile {
   position: absolute;
   overflow: hidden;
@@ -101,7 +109,9 @@ h1, h2, h3, p {
 }
 
 .deco-tile--bordered {
-  border: 2px solid var(--ink);
+  border-style: solid;
+  border-color: var(--ink);
+  border-width: 2px; /* overridden inline when a tile sets its own borderWidth */
 }
 
 .deco-tile--matted {
@@ -143,4 +153,27 @@ h1, h2, h3, p {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--ink);
+}
+
+.deco-tile__text--small {
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.deco-tile__text--large {
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  line-height: 1.35;
+}
+
+.deco-tile__text--headline {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+/* All-caps needs its own letter-spacing to read well — serif capitals
+   set this tight otherwise feel cramped, especially at headline size. */
+.deco-tile__text--uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }

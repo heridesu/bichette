@@ -15,13 +15,30 @@ interface Props {
   width?: number;
   /** A thin black line at the frame's outer edge. */
   border?: boolean;
+  /** Border thickness in px. Only meaningful when `border` is true.
+      Omitted means the long-standing default of 2px. */
+  borderWidth?: number;
   /** White padding between the image and the frame's edge — a mat/passe-partout.
       Combines with `border` (the border draws around the mat, not the image). */
   mat?: boolean;
+  /** Clicking opens this image full-screen in place (the same lightbox the
+      homepage and collage tiles use) instead of following `href` — the
+      two are mutually exclusive. */
+  lightbox?: boolean;
+  /** Focal point (0-100%) for the existing object-fit: cover crop —
+   * re-centers which part of the image shows, without touching the
+   * original file. Omitted = 50/50, today's exact centered behavior. */
+  focalX?: number;
+  focalY?: number;
 }
 
-const { src, alt = '', caption, aspect, size = 'inline', href, width, border, mat } = Astro.props;
-const Wrap = href ? 'a' : 'div';
+const { src, alt = '', caption, aspect, size = 'inline', href, width, border, borderWidth, mat, lightbox, focalX, focalY } = Astro.props;
+const Wrap = lightbox ? 'div' : href ? 'a' : 'div';
+const wrapAttrs = lightbox
+  ? { role: 'button', tabindex: 0, 'data-lightbox-src': src, 'data-lightbox-alt': alt, 'aria-label': 'View image full size' }
+  : href
+    ? { href, target: href.startsWith('http') ? '_blank' : undefined, rel: href.startsWith('http') ? 'noopener noreferrer' : undefined }
+    : {};
 const narrow = typeof width === 'number' && width < 100;
 const frameClass = `figure__frame${border ? ' figure__frame--bordered' : ''}${mat ? ' figure__frame--matted' : ''}`;
 // The hero image is an entry page's lead photo — almost always the
@@ -32,7 +49,11 @@ const srcset = responsiveSrcSet(src);
 ---
 
 <figure class={`figure figure--${size}${narrow ? ' figure--narrow' : ''}`} style={narrow ? `width: ${width}%;` : ''}>
-  <Wrap class={frameClass} style={aspect ? `aspect-ratio: ${aspect};` : ''} {...(href ? { href, target: href.startsWith('http') ? '_blank' : undefined, rel: href.startsWith('http') ? 'noopener noreferrer' : undefined } : {})}>
+  <Wrap
+    class={frameClass}
+    style={`${aspect ? `aspect-ratio: ${aspect};` : ''}${border ? `border-width: ${borderWidth ?? 2}px;` : ''}`}
+    {...(wrapAttrs as any)}
+  >
     <img
       src={src}
       srcset={srcset}
@@ -40,6 +61,7 @@ const srcset = responsiveSrcSet(src);
       alt={alt}
       loading={isHero ? 'eager' : 'lazy'}
       fetchpriority={isHero ? 'high' : undefined}
+      style={`object-position: ${focalX ?? 50}% ${focalY ?? 50}%;`}
     />
   </Wrap>
   {caption && <figcaption class="figure__caption">{caption}</figcaption>}
@@ -83,7 +105,8 @@ const srcset = responsiveSrcSet(src);
   }
 
   .figure__frame--bordered {
-    border: 2px solid var(--ink);
+    border-style: solid;
+    border-color: var(--ink);
   }
 
   .figure__frame--matted {

@@ -6,12 +6,16 @@
 // <FigureGrid cols={3}><Figure .../><Figure .../></FigureGrid>
 interface Props {
   cols?: 1 | 2 | 3 | 4;
+  /** 'contact-sheet' forces every cell to a uniform square and drops the
+      gap/captions down to a dense, uncomposed archive look — for a pile
+      of similar photos you don't want to hand-arrange one by one. */
+  style?: 'grid' | 'contact-sheet';
 }
 
-const { cols = 2 } = Astro.props;
+const { cols = 2, style = 'grid' } = Astro.props;
 ---
 
-<div class="figure-grid" data-cols={cols}>
+<div class={`figure-grid${style === 'contact-sheet' ? ' figure-grid--contact-sheet' : ''}`} data-cols={cols}>
   <slot />
 </div>
 
@@ -37,6 +41,18 @@ const { cols = 2 } = Astro.props;
 
   .figure-grid :global(figure.figure) {
     margin: 0;
+  }
+
+  .figure-grid--contact-sheet {
+    gap: 0.25rem;
+  }
+
+  .figure-grid--contact-sheet :global(.figure__frame) {
+    aspect-ratio: 1;
+  }
+
+  .figure-grid--contact-sheet :global(.figure__caption) {
+    display: none;
   }
 
   @media (max-width: 640px) {

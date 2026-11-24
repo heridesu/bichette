@@ -22,14 +22,42 @@ const collageItemBase = {
   // Same thin-border / white-mat framing options as a Standard page's
   // own Image block (see src/components/Figure.astro).
   border: z.boolean().optional(),
+  // Border thickness in px — only meaningful when `border` is true;
+  // omitted means the long-standing 2px default.
+  borderWidth: z.number().optional(),
   mat: z.boolean().optional(),
+  // Mat thickness in px at the canvas's own native width — only
+  // meaningful when `mat` is true; omitted means the 14px default.
+  matPadding: z.number().optional(),
+  // Excluded from Shuffle Images/Layout and manual drag/resize in
+  // Studio — an authoring-only concept, never read by the public site.
+  locked: z.boolean().optional(),
 };
 
 const collageTile = z.discriminatedUnion('kind', [
-  z.object({ ...collageItemBase, kind: z.literal('image'), src: z.string(), alt: z.string().optional(), aspect: z.string().optional() }),
+  z.object({
+    ...collageItemBase,
+    kind: z.literal('image'),
+    src: z.string(),
+    alt: z.string().optional(),
+    aspect: z.string().optional(),
+    // Opens this image full-screen on click (same lightbox as the
+    // homepage's "Full image" link type) instead of following `href`.
+    lightbox: z.boolean().optional(),
+    // Focal point (0-100%) for the existing object-fit: cover crop —
+    // omitted = 50/50, today's exact centered behavior.
+    focalX: z.number().optional(),
+    focalY: z.number().optional(),
+  }),
   z.object({ ...collageItemBase, kind: z.literal('video'), src: z.string(), aspect: z.string().optional() }),
   z.object({ ...collageItemBase, kind: z.literal('youtube'), url: z.string() }),
-  z.object({ ...collageItemBase, kind: z.literal('text'), text: z.string() }),
+  z.object({
+    ...collageItemBase,
+    kind: z.literal('text'),
+    text: z.string(),
+    textSize: z.enum(['small', 'body', 'large', 'headline']).optional(),
+    uppercase: z.boolean().optional(),
+  }),
 ]);
 
 const tapePiece = z.object({
@@ -48,6 +76,7 @@ const tapePiece = z.object({
   torn: z.boolean(),
   tornSeed: z.number().optional(),
   z: z.number().optional(),
+  locked: z.boolean().optional(),
 });
 
 const tackPiece = z.object({
@@ -55,6 +84,7 @@ const tackPiece = z.object({
   left: z.number(),
   top: z.number(),
   z: z.number().optional(),
+  locked: z.boolean().optional(),
 });
 
 // Independent work areas stacked vertically down the page — the same
@@ -70,10 +100,51 @@ const collageSection = z.object({
   tiles: z.array(collageTile),
   tape: z.array(tapePiece),
   tacks: z.array(tackPiece),
+  // This section's own template family/variant, if any — lets Shuffle
+  // Images/Layout operate on just this one section independently.
+  templateId: z.string().optional(),
+  templateVariant: z.number().optional(),
+  // Breaks this section out to the full viewport width instead of sitting
+  // inside the page's normal gutter.
+  fullBleed: z.boolean().optional(),
 });
 
 const collageData = z.object({
   sections: z.array(collageSection),
+  // Which starting template this collage was built from, if any — lets
+  // "shuffle within this template" offer other variants of the same
+  // family. Freeform/manually-built collages simply omit this.
+  templateId: z.string().optional(),
+  // Which of that template's variants is currently active, so Shuffle
+  // Layout can pick a genuinely different one next time.
+  templateVariant: z.number().optional(),
+});
+
+// A standalone page template: a uniform, automatically-arranged grid of
+// photos (not freeform placement like Collage, and not nested inside a
+// Standard page's content blocks). Three selectable visual styles share
+// one shape — gaps/aspect/columns are left optional so an unset field
+// keeps following whichever style is active instead of a value baked in
+// before a style switch.
+const contactSheetImage = z.object({
+  id: z.string(),
+  src: z.string(),
+  alt: z.string().optional(),
+  caption: z.string().optional(),
+  focalX: z.number().optional(),
+  focalY: z.number().optional(),
+});
+
+const contactSheetData = z.object({
+  images: z.array(contactSheetImage),
+  style: z.enum(['editorial', 'compact', 'film']),
+  columnsDesktop: z.number().optional(),
+  columnsMobile: z.number().optional(),
+  gapX: z.number().optional(),
+  gapY: z.number().optional(),
+  aspect: z.enum(['original', 'square', 'portrait', 'landscape']).optional(),
+  showCaptions: z.boolean().optional(),
+  showFrameNumbers: z.boolean().optional(),
 });
 
 // A single "entries" collection holds every kind of thing that goes on the
@@ -107,6 +178,12 @@ const entries = defineCollection({
     // Manual pin to the top of the index, used sparingly.
     featured: z.boolean().optional(),
 
+    // Excluded from the nav's "elsewhere" random-page link — for a page
+    // that's still being worked on, or deliberately kept out of casual
+    // discovery. The page itself still builds and is reachable by its
+    // direct URL; this only affects that one surface.
+    hidden: z.boolean().optional(),
+
     // Opt an entry into the homepage collage, and suggest roughly how much
     // room it should take relative to everything else there. The homepage
     // never shows captions regardless of this — it's a wall of images, not
@@ -127,9 +204,21 @@ const entries = defineCollection({
 
     // 'standard' (default) renders the usual title/body/blocks article.
     // 'collage' replaces that with a freeform drag-and-drop canvas — see
-    // `collageData` above.
-    template: z.enum(['standard', 'collage']).optional(),
+    // `collageData` above. 'contact-sheet' replaces it with a uniform,
+    // automatically-arranged photo grid — see `contactSheetData` above.
+    template: z.enum(['standard', 'collage', 'contact-sheet']).optional(),
     collage: collageData.optional(),
+    contactSheet: contactSheetData.optional(),
+
+    // A starting-point preset for a Standard page — purely typographic/
+    // spacing, layered on the same title/figure/body-block markup below.
+    // Meaningless when template === 'collage'.
+    pageStyle: z.enum(['photo-essay', 'editorial', 'object-study', 'single-image']).optional(),
+    // Single Image style: an optional second, smaller photo, and a short
+    // italic aside distinct from the more formal `caption` above.
+    detailImage: z.string().optional(),
+    detailImageAlt: z.string().optional(),
+    note: z.string().optional(),
   }),
 });
 
