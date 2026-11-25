@@ -11,10 +11,14 @@ interface Props {
 
 const { data, groupId } = Astro.props;
 
-const STYLE_DEFAULTS: Record<ContactSheetStyle, { gapX: number; gapY: number; aspect: ContactSheetAspect }> = {
-  editorial: { gapX: 6, gapY: 6, aspect: 'portrait' },
-  compact: { gapX: 2, gapY: 2, aspect: 'square' },
-  film: { gapX: 4, gapY: 4, aspect: 'original' },
+const STYLE_DEFAULTS: Record<ContactSheetStyle, { gapX: number; gapY: number; aspect: ContactSheetAspect; showFrameNumbers: boolean }> = {
+  editorial: { gapX: 6, gapY: 6, aspect: 'portrait', showFrameNumbers: false },
+  compact: { gapX: 2, gapY: 2, aspect: 'square', showFrameNumbers: false },
+  // Frame numbers are the one thing that actually reads as "a contact
+  // sheet" rather than just a dark grid — on by default for Film so
+  // picking this style gives the real look immediately, not after an
+  // extra checkbox click. Still fully overridable per sheet.
+  film: { gapX: 4, gapY: 4, aspect: 'original', showFrameNumbers: true },
 };
 
 const defaults = STYLE_DEFAULTS[data.style];
@@ -23,6 +27,7 @@ const columnsMobile = data.columnsMobile ?? 2;
 const gapX = data.gapX ?? defaults.gapX;
 const gapY = data.gapY ?? defaults.gapY;
 const aspect = data.aspect ?? defaults.aspect;
+const showFrameNumbers = data.showFrameNumbers ?? defaults.showFrameNumbers;
 
 const ASPECT_RATIO: Record<ContactSheetAspect, string | undefined> = {
   original: undefined,
@@ -59,7 +64,7 @@ const aspectRatio = ASPECT_RATIO[aspect];
           style={`object-position:${image.focalX ?? 50}% ${image.focalY ?? 50}%;`}
         />
       </div>
-      {data.style === 'film' && data.showFrameNumbers && <span class="contact-sheet__framenum">{i + 1}</span>}
+      {data.style === 'film' && showFrameNumbers && <span class="contact-sheet__framenum">{i + 1}</span>}
       {data.showCaptions && image.caption && <figcaption class="contact-sheet__caption">{image.caption}</figcaption>}
     </figure>
   ))}

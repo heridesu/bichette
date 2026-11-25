@@ -7,10 +7,12 @@ function genId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const STYLE_DEFAULTS: Record<ContactSheetStyle, { gapX: number; gapY: number; aspect: ContactSheetAspect }> = {
-  editorial: { gapX: 6, gapY: 6, aspect: 'portrait' },
-  compact: { gapX: 2, gapY: 2, aspect: 'square' },
-  film: { gapX: 4, gapY: 4, aspect: 'original' },
+const STYLE_DEFAULTS: Record<ContactSheetStyle, { gapX: number; gapY: number; aspect: ContactSheetAspect; showFrameNumbers: boolean }> = {
+  editorial: { gapX: 6, gapY: 6, aspect: 'portrait', showFrameNumbers: false },
+  compact: { gapX: 2, gapY: 2, aspect: 'square', showFrameNumbers: false },
+  // On by default for Film — it's the one element that actually reads as
+  // "a contact sheet" rather than just a dark grid.
+  film: { gapX: 4, gapY: 4, aspect: 'original', showFrameNumbers: true },
 };
 
 const ASPECT_RATIO: Record<ContactSheetAspect, string | undefined> = {
@@ -45,6 +47,7 @@ export default function ContactSheetEditor({ data, onChange, onUpload, previewMo
   const aspectRatio = ASPECT_RATIO[aspect];
   const columnsDesktop = data.columnsDesktop ?? 3;
   const columnsMobile = data.columnsMobile ?? 2;
+  const showFrameNumbers = data.showFrameNumbers ?? defaults.showFrameNumbers;
 
   function patch(fields: Partial<ContactSheetData>) {
     onChange({ ...dataRef.current, ...fields });
@@ -162,8 +165,8 @@ export default function ContactSheetEditor({ data, onChange, onUpload, previewMo
             <label className="studio__lock-toggle">
               <input
                 type="checkbox"
-                checked={data.showFrameNumbers ?? false}
-                onChange={(e) => patch({ showFrameNumbers: e.target.checked || undefined })}
+                checked={showFrameNumbers}
+                onChange={(e) => patch({ showFrameNumbers: e.target.checked })}
               />
               Frame numbers
             </label>
@@ -244,7 +247,7 @@ export default function ContactSheetEditor({ data, onChange, onUpload, previewMo
                   </button>
                 )}
               </div>
-              {data.style === 'film' && data.showFrameNumbers && <span className="contact-sheet__framenum">{i + 1}</span>}
+              {data.style === 'film' && showFrameNumbers && <span className="contact-sheet__framenum">{i + 1}</span>}
               {data.showCaptions && img.caption && <figcaption className="contact-sheet__caption">{img.caption}</figcaption>}
             </figure>
           ))}
